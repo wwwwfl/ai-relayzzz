@@ -9,8 +9,11 @@ import type { UsageRecord } from './types';
  * (e.g., local dev without KV). Graceful degradation.
  */
 async function getKV() {
+  // Check env vars BEFORE importing — @vercel/kv throws on init if missing
+  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+    return null;
+  }
   try {
-    // Dynamic import — only works when @vercel/kv is configured
     const { kv } = await import('@vercel/kv');
     return kv;
   } catch {
