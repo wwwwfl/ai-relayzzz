@@ -40,23 +40,27 @@ export default function AdminPage() {
     const cached = localStorage.getItem('airelay_admin_key');
     if (cached) {
       setApiKey(cached);
-      // Auto-login with cached key
-      setAuthenticated(true);
+      setLoading(true);
       fetch('/api/admin', {
         headers: { Authorization: `Bearer ${cached}` },
       })
         .then((res) => {
           if (res.status === 401) {
             localStorage.removeItem('airelay_admin_key');
-            setAuthenticated(false);
+            return;
           }
           return res.json();
         })
-        .then((json) => setData(json))
+        .then((json) => {
+          if (json) {
+            setData(json);
+            setAuthenticated(true);
+          }
+        })
         .catch(() => {
           localStorage.removeItem('airelay_admin_key');
-          setAuthenticated(false);
-        });
+        })
+        .finally(() => setLoading(false));
     }
   }, []);
 
