@@ -12,6 +12,10 @@ const cooldowns = new Map<string, number>();
 
 const COOLDOWN_MS = 60_000; // 60s cooldown after 429/5xx
 
+/** Last-resort refresh interval for managed keys (5 min) */
+const MANAGED_KEY_REFRESH_MS = 300_000;
+const lastManagedRefresh = new Map<string, number>();
+
 /**
  * Hash a key to a short identifier (for KV storage / logging).
  * Uses djb2 — fast, no crypto dependency.
@@ -41,6 +45,27 @@ function parseKeys(envValue: string | undefined, provider: string): ApiKey[] {
 }
 
 /**
+ * Try to load managed keys from admin KV config.
+ * Returns null if KV is not configured or no managed keys exist.
+ */
+async function loadManagedKeys(providerName: string): Promise<ApiKey[] | null> {
+  try {
+    const { getManagedKeys } = await import('../admin/admin-config');
+    const managed = await getManagedKeys(providerName);
+    if (managed && managed.length > 0) {
+      return managed.map((key) => ({
+        key,
+        hash: hashKey(key),
+        provider: providerName,
+      }));
+    }
+  } catch {
+    // admin-config not available or KV not configured
+  }
+  return null;
+}
+
+/**
  * Initialize or refresh key pools from environment variables.
  */
 function initKeyPool(config: ProviderConfig): KeyPool {
@@ -56,17 +81,39 @@ function initKeyPool(config: ProviderConfig): KeyPool {
 
 /**
  * Get the key pool for a provider, initializing if needed.
+ * Checks KV for managed keys first; falls back to env vars.
  */
-export function getKeyPool(config: ProviderConfig): KeyPool {
-  return keyPools.get(config.name) || initKeyPool(config);
+export async function getKeyPool(config: ProviderConfig): Promise<KeyPool> {
+  const existing = keyPools.get(config.name);
+  if (existing) {
+    // Periodically refresh managed keys (every 5 min)
+    const lastRefresh = lastManagedRefresh.get(config.name) || 0;
+    if (Date.now() - lastRefresh > MANAGED_KEY_REFRESH_MS) {
+      const managed = await loadManagedKeys(config.name);
+      if (managed) {
+        existing.keys = managed;
+        lastManagedRefresh.set(config.name, Date.now());
+      }
+    }
+    return existing;
+  }
+  // First call — try managed keys, then env vars
+  const managed = await loadManagedKeys(config.name);
+  if (managed) {
+    const pool: KeyPool = { provider: config.name, keys: managed, counter: 0 };
+    keyPools.set(config.name, pool);
+    lastManagedRefresh.set(config.name, Date.now());
+    return pool;
+  }
+  return initKeyPool(config);
 }
 
 /**
  * Select the next available key using round-robin with cooldown skip.
  * Returns null if all keys are on cooldown.
  */
-export function selectKey(config: ProviderConfig): ApiKey | null {
-  const pool = getKeyPool(config);
+export async function selectKey(config: ProviderConfig): Promise<ApiKey | null> {
+  const pool = await getKeyPool(config);
   if (pool.keys.length === 0) return null;
 
   const now = Date.now();

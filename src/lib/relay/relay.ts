@@ -3,7 +3,7 @@
 // ============================================================
 
 import type { ChatCompletionRequest } from '../types';
-import type { RelayResult, ProviderConfig } from '../providers/types';
+import type { RelayResult, ProviderConfig, ApiKey } from '../providers/types';
 import { resolveProvider, getUpstreamUrl, resolveModelAlias, PROVIDERS } from '../providers';
 import { selectKey, markCooldown, getKeyPool } from './key-pool';
 import { buildHeaders, transformToAnthropic } from './transform';
@@ -65,7 +65,7 @@ export async function relayRequest(
   }
 
   // Select an API key
-  const apiKey = selectKey(provider);
+  const apiKey = await selectKey(provider);
   if (!apiKey) {
     throw new RelayError(
       `No API keys configured for provider: ${provider.displayName}`,
@@ -78,7 +78,7 @@ export async function relayRequest(
   const resolvedModel = resolveModelAlias(body.model);
 
   // Retry with key rotation + exponential backoff
-  const pool = getKeyPool(provider);
+  const pool = await getKeyPool(provider);
   const maxRetries = Math.min(pool.keys.length, 3);
 
   // Try primary provider with retries (with concurrency control)
@@ -89,12 +89,9 @@ export async function relayRequest(
     return primaryResult.result;
   }
 
-  // If primary provider failed, try fallback chain (array preferred, single field for backward compat)
-  const fallbackNames: string[] = provider.fallbackProviders?.length
-    ? provider.fallbackProviders
-    : provider.fallbackProvider
-      ? [provider.fallbackProvider]
-      : [];
+  // If primary provider failed, try fallback chain from KV (or static default)
+  const { getFallbackChain } = await import('../admin/admin-config');
+  const fallbackNames = await getFallbackChain(provider.name, provider.fallbackProvider);
 
   const errors: { provider: string; error: string }[] = [
     { provider: provider.displayName, error: primaryResult.lastError?.message || 'unknown error' },
@@ -109,13 +106,13 @@ export async function relayRequest(
     }
 
     console.log(`Trying fallback: ${fbProvider.displayName} (after ${provider.displayName} failed)`);
-    const fbKey = selectKey(fbProvider);
+    const fbKey = await selectKey(fbProvider);
     if (!fbKey) {
       console.warn(`[fallback] ${fbProvider.displayName} has no API keys (env: ${fbProvider.envKeyField})`);
       errors.push({ provider: fbProvider.displayName, error: 'No API keys configured' });
       continue;
     }
-    const fbPool = getKeyPool(fbProvider);
+    const fbPool = await getKeyPool(fbProvider);
     const fbMaxRetries = Math.min(fbPool.keys.length, 3);
     if (fbMaxRetries === 0) {
       console.warn(`[fallback] ${fbProvider.displayName} pool is empty, skipping`);
@@ -148,7 +145,7 @@ async function tryProviderWithRetries(
   provider: ProviderConfig,
   body: ChatCompletionRequest,
   resolvedModel: string,
-  initialKey: ReturnType<typeof selectKey>,
+  initialKey: ApiKey | null,
   maxRetries: number
 ): Promise<{ result: RelayResult | null; lastError: Error | null }> {
   let currentKey = initialKey;
@@ -161,7 +158,7 @@ async function tryProviderWithRetries(
     }
 
     // Re-check circuit breaker before each attempt
-    const retryCheck = checkRateLimit(provider.name);
+    const retryCheck = await checkRateLimit(provider.name);
     if (!retryCheck.allowed) {
       lastError = new Error(retryCheck.reason || 'Rate limit exceeded');
       continue;
@@ -169,7 +166,7 @@ async function tryProviderWithRetries(
 
     // Select an API key if needed
     if (!currentKey) {
-      currentKey = selectKey(provider);
+      currentKey = await selectKey(provider);
       if (!currentKey) {
         lastError = new Error(`No API keys configured for provider: ${provider.displayName}`);
         continue;
@@ -200,11 +197,11 @@ async function tryProviderWithRetries(
 
       // 429 → record in rate limiter + try next key
       if (upstreamResponse.status === 429) {
-        record429(provider.name);
-        markCooldown(currentKey);
-        recordError(provider.name, currentKey.hash, 429, 'Rate limited by upstream');
+        await record429(provider.name);
+        await markCooldown(currentKey);
+        await recordError(provider.name, currentKey.hash, 429, 'Rate limited by upstream');
         lastError = new Error('Rate limited by upstream');
-        const nextKey = selectKey(provider);
+        const nextKey = await selectKey(provider);
         if (nextKey && nextKey.hash !== currentKey.hash) {
           currentKey = nextKey;
           continue;
@@ -214,10 +211,10 @@ async function tryProviderWithRetries(
 
       // 401/403 → key invalid/expired, rotate to next key
       if (upstreamResponse.status === 401 || upstreamResponse.status === 403) {
-        markCooldown(currentKey);
-        recordError(provider.name, currentKey.hash, upstreamResponse.status, 'Auth failed — key invalid or expired');
+        await markCooldown(currentKey);
+        await recordError(provider.name, currentKey.hash, upstreamResponse.status, 'Auth failed — key invalid or expired');
         lastError = new Error('Auth failed — key invalid or expired');
-        const nextKey = selectKey(provider);
+        const nextKey = await selectKey(provider);
         if (nextKey && nextKey.hash !== currentKey.hash) {
           currentKey = nextKey;
           continue;
@@ -227,10 +224,10 @@ async function tryProviderWithRetries(
 
       // 5xx → try next key (but don't count as 429 for circuit breaker)
       if (upstreamResponse.status >= 500) {
-        markCooldown(currentKey);
-        recordError(provider.name, currentKey.hash, upstreamResponse.status, 'Upstream server error');
+        await markCooldown(currentKey);
+        await recordError(provider.name, currentKey.hash, upstreamResponse.status, 'Upstream server error');
         lastError = new Error(`Upstream server error (HTTP ${upstreamResponse.status})`);
-        const nextKey = selectKey(provider);
+        const nextKey = await selectKey(provider);
         if (nextKey && nextKey.hash !== currentKey.hash) {
           currentKey = nextKey;
           continue;
@@ -239,7 +236,7 @@ async function tryProviderWithRetries(
       }
 
       // Success → record in rate limiter
-      recordSuccess(provider.name);
+      await recordSuccess(provider.name);
 
       // NOTE: Usage tracking is done in the route handler, not here.
       // This avoids double-counting for non-streaming responses.
@@ -247,8 +244,8 @@ async function tryProviderWithRetries(
       return { result: { response: upstreamResponse, provider, apiKey: currentKey }, lastError };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      markCooldown(currentKey);
-      const nextKey = selectKey(provider);
+      await markCooldown(currentKey);
+      const nextKey = await selectKey(provider);
       if (nextKey && nextKey.hash !== currentKey.hash) {
         currentKey = nextKey;
         continue;
