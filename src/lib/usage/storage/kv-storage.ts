@@ -9,6 +9,7 @@ import type {
   ProviderTrendPoint,
   QuotaStatus,
 } from '../sdk';
+import { withTimeout } from '@/lib/utils/timeout';
 
 /** Known provider names for trend queries */
 const PROVIDER_NAMES = ['openai', 'anthropic', 'deepseek', 'xiaomimimo', 'xiaomi', 'lpgpt'];
@@ -136,39 +137,52 @@ export class KVUsageStorage implements UsageStorage {
       if (!kv) return;
 
       const date = today();
+      const month = thisMonth();
       const totalTokens = event.totalTokens;
+
+      const promises: Promise<unknown>[] = [];
 
       // Per-key daily usage
       const keyDailyKey = `usage:${event.apiKeyHash}:daily:${date}`;
-      await kv.hincrby(keyDailyKey, 'requests', 1);
-      await kv.hincrby(keyDailyKey, 'tokens', totalTokens);
-      await kv.expire(keyDailyKey, 86400 * 7);
+      promises.push(
+        kv.hincrby(keyDailyKey, 'requests', 1),
+        kv.hincrby(keyDailyKey, 'tokens', totalTokens),
+        kv.expire(keyDailyKey, 86400 * 7)
+      );
 
       // Per-key total usage
       const keyTotalKey = `usage:${event.apiKeyHash}:total`;
-      await kv.hincrby(keyTotalKey, 'requests', 1);
-      await kv.hincrby(keyTotalKey, 'tokens', totalTokens);
+      promises.push(
+        kv.hincrby(keyTotalKey, 'requests', 1),
+        kv.hincrby(keyTotalKey, 'tokens', totalTokens)
+      );
 
       // Global daily usage (with prompt/completion split)
       const globalDailyKey = `usage:daily:${date}`;
-      await kv.hincrby(globalDailyKey, 'requests', 1);
-      await kv.hincrby(globalDailyKey, 'tokens', totalTokens);
-      await kv.hincrby(globalDailyKey, 'promptTokens', event.promptTokens);
-      await kv.hincrby(globalDailyKey, 'completionTokens', event.completionTokens);
-      await kv.expire(globalDailyKey, 86400 * 30);
+      promises.push(
+        kv.hincrby(globalDailyKey, 'requests', 1),
+        kv.hincrby(globalDailyKey, 'tokens', totalTokens),
+        kv.hincrby(globalDailyKey, 'promptTokens', event.promptTokens),
+        kv.hincrby(globalDailyKey, 'completionTokens', event.completionTokens),
+        kv.expire(globalDailyKey, 86400 * 30)
+      );
 
       // Per-provider daily usage
       if (event.provider) {
         const providerDailyKey = `usage:provider:${event.provider}:daily:${date}`;
-        await kv.hincrby(providerDailyKey, 'requests', 1);
-        await kv.hincrby(providerDailyKey, 'tokens', totalTokens);
-        await kv.hincrby(providerDailyKey, 'promptTokens', event.promptTokens);
-        await kv.hincrby(providerDailyKey, 'completionTokens', event.completionTokens);
-        await kv.expire(providerDailyKey, 86400 * 30);
+        promises.push(
+          kv.hincrby(providerDailyKey, 'requests', 1),
+          kv.hincrby(providerDailyKey, 'tokens', totalTokens),
+          kv.hincrby(providerDailyKey, 'promptTokens', event.promptTokens),
+          kv.hincrby(providerDailyKey, 'completionTokens', event.completionTokens),
+          kv.expire(providerDailyKey, 86400 * 30)
+        );
       }
 
       // Increment quota counters
-      await this.incrementQuota(kv);
+      promises.push(...this.incrementQuotaPromises(kv, date, month));
+
+      await withTimeout(Promise.all(promises), 1000, [], 'recordUsage');
     } catch {
       // Non-critical — never break the request
     }
@@ -177,9 +191,9 @@ export class KVUsageStorage implements UsageStorage {
   /**
    * Record an API error for tracking.
    * KV keys:
-+   *   error:{provider}:{date} → hash {status:count, ...}
-+   *   error:key:{keyHash}:{date} → hash {status:count, reason:...}
-+   */
+   *   error:{provider}:{date} → hash {status:count, ...}
+   *   error:key:{keyHash}:{date} → hash {status:count, reason:...}
+   */
   async recordError(event: {
     provider: string;
     keyHash: string;
@@ -193,22 +207,32 @@ export class KVUsageStorage implements UsageStorage {
       const date = today();
       const status = String(event.statusCode);
 
+      const promises: Promise<unknown>[] = [];
+
       // Per-provider daily error counts
       const providerKey = `error:${event.provider}:${date}`;
-      await kv.hincrby(providerKey, status, 1);
-      await kv.expire(providerKey, 86400 * 7);
+      promises.push(
+        kv.hincrby(providerKey, status, 1),
+        kv.expire(providerKey, 86400 * 7)
+      );
 
       // Per-key daily error details
       const keyErrorKey = `error:key:${event.keyHash}:${date}`;
-      await kv.hincrby(keyErrorKey, status, 1);
-      // Store latest reason for this status code
-      await kv.hset(keyErrorKey, `reason:${status}`, event.reason.slice(0, 200));
-      await kv.expire(keyErrorKey, 86400 * 7);
+      promises.push(
+        kv.hincrby(keyErrorKey, status, 1),
+        // Store latest reason for this status code
+        kv.hset(keyErrorKey, `reason:${status}`, event.reason.slice(0, 200)),
+        kv.expire(keyErrorKey, 86400 * 7)
+      );
 
       // Track which key hashes had errors today (for efficient lookup)
       const indexKey = `error:keys:${date}`;
-      await kv.sadd(indexKey, event.keyHash);
-      await kv.expire(indexKey, 86400 * 7);
+      promises.push(
+        kv.sadd(indexKey, event.keyHash),
+        kv.expire(indexKey, 86400 * 7)
+      );
+
+      await withTimeout(Promise.all(promises), 1000, [], 'recordError');
     } catch {
       // Non-critical
     }
@@ -230,11 +254,16 @@ export class KVUsageStorage implements UsageStorage {
       const result: Record<string, Record<string, number>> = {};
 
       // Fetch all provider error stats in parallel
-      const providerResults = await Promise.all(
-        PROVIDER_NAMES.map(async (provider) => {
-          const raw = await kv.hgetall(`error:${provider}:${date}`);
-          return { provider, raw };
-        })
+      const providerResults = await withTimeout(
+        Promise.all(
+          PROVIDER_NAMES.map(async (provider) => {
+            const raw = await kv.hgetall(`error:${provider}:${date}`);
+            return { provider, raw };
+          })
+        ),
+        1000,
+        [],
+        'getErrorStats:hgetall'
       );
 
       for (const { provider, raw } of providerResults) {
@@ -275,16 +304,26 @@ export class KVUsageStorage implements UsageStorage {
 
       // Get all key hashes that had errors today from the SET
       const indexKey = `error:keys:${date}`;
-      const keyHashes: string[] = await kv.smembers(indexKey);
+      const keyHashes: string[] = await withTimeout(
+        kv.smembers(indexKey),
+        1000,
+        [],
+        'getKeyErrors:smembers'
+      );
       if (!keyHashes || keyHashes.length === 0) return [];
 
       // Fetch all key errors in parallel
-      const keyResults = await Promise.all(
-        keyHashes.map(async (keyHash: string) => {
-          const redisKey = `error:key:${keyHash}:${date}`;
-          const raw = await kv.hgetall(redisKey);
-          return { keyHash, raw };
-        })
+      const keyResults = await withTimeout(
+        Promise.all(
+          keyHashes.map(async (keyHash: string) => {
+            const redisKey = `error:key:${keyHash}:${date}`;
+            const raw = await kv.hgetall(redisKey);
+            return { keyHash, raw };
+          })
+        ),
+        1000,
+        [],
+        'getKeyErrors:hgetall'
       );
 
       for (const { keyHash, raw } of keyResults) {
@@ -324,8 +363,15 @@ export class KVUsageStorage implements UsageStorage {
       if (!kv) return null;
 
       const date = today();
-      const dailyRaw = await kv.hgetall(`usage:${keyHash}:daily:${date}`);
-      const totalRaw = await kv.hgetall(`usage:${keyHash}:total`);
+      const [dailyRaw, totalRaw] = await withTimeout(
+        Promise.all([
+          kv.hgetall(`usage:${keyHash}:daily:${date}`),
+          kv.hgetall(`usage:${keyHash}:total`),
+        ]),
+        1000,
+        [null, null] as [Record<string, unknown> | null, Record<string, unknown> | null],
+        `getKeyUsage:${keyHash}`
+      );
 
       const result = {
         daily: {
@@ -366,14 +412,19 @@ export class KVUsageStorage implements UsageStorage {
       if (!kv) return null;
 
       const date = today();
-      const raw = await kv.hgetall(`usage:daily:${date}`);
-
-      // Fetch per-provider usage in parallel
-      const providerResults = await Promise.all(
-        PROVIDER_NAMES.map(async (provider) => {
-          const pRaw = await kv.hgetall(`usage:provider:${provider}:daily:${date}`);
-          return { provider, raw: pRaw };
-        })
+      const [raw, providerResults] = await withTimeout(
+        Promise.all([
+          kv.hgetall(`usage:daily:${date}`) as Promise<Record<string, unknown> | null>,
+          Promise.all(
+            PROVIDER_NAMES.map(async (provider) => {
+              const pRaw = await kv.hgetall(`usage:provider:${provider}:daily:${date}`);
+              return { provider, raw: pRaw };
+            })
+          ),
+        ]),
+        1000,
+        [null, []] as [Record<string, unknown> | null, Array<{ provider: string; raw: Record<string, unknown> | null }>],
+        'getGlobalUsage'
       );
 
       const providers: Record<string, { requests: number; tokens: number; promptTokens: number; completionTokens: number }> = {};
@@ -427,46 +478,55 @@ export class KVUsageStorage implements UsageStorage {
 
     const dates = dateRange(days);
 
-    const globalPromises = dates.map(async (date) => {
-      const raw = await kv.hgetall(`usage:daily:${date}`);
-      return parseDailyPoint(date, raw as Record<string, unknown> | null);
-    });
-
-    const providerPromises = PROVIDER_NAMES.map(async (provider) => {
-      const dataPromises = dates.map(async (date) => {
-        const raw = await kv.hgetall(`usage:provider:${provider}:daily:${date}`);
+    try {
+      const globalPromises = dates.map(async (date) => {
+        const raw = await kv.hgetall(`usage:daily:${date}`);
         return parseDailyPoint(date, raw as Record<string, unknown> | null);
       });
-      const data = await Promise.all(dataPromises);
-      return { provider, data };
-    });
 
-    const [globalDaily, providersDaily] = await Promise.all([
-      Promise.all(globalPromises),
-      Promise.all(providerPromises),
-    ]);
+      const providerPromises = PROVIDER_NAMES.map(async (provider) => {
+        const dataPromises = dates.map(async (date) => {
+          const raw = await kv.hgetall(`usage:provider:${provider}:daily:${date}`);
+          return parseDailyPoint(date, raw as Record<string, unknown> | null);
+        });
+        const data = await Promise.all(dataPromises);
+        return { provider, data };
+      });
 
-    if (granularity === 'day') {
-      const activeProviders = providersDaily.filter((p) =>
-        p.data.some((d) => d.totalTokens > 0)
+      const [globalDaily, providersDaily] = await withTimeout(
+        Promise.all([
+          Promise.all(globalPromises),
+          Promise.all(providerPromises),
+        ]),
+        2000,
+        [[], []] as [TrendPoint[], Array<{ provider: string; data: TrendPoint[] }>],
+        'getUsageTrend'
       );
-      const result = { global: globalDaily, providers: activeProviders };
+
+      if (granularity === 'day') {
+        const activeProviders = providersDaily.filter((p) =>
+          p.data.some((d) => d.totalTokens > 0)
+        );
+        const result = { global: globalDaily, providers: activeProviders };
+        setCache(cacheKey, result);
+        return result;
+      }
+
+      const labelFn = granularity === 'week' ? getWeekLabel : getMonthLabel;
+      const global = aggregatePoints(globalDaily, labelFn);
+      const providers = providersDaily
+        .map((p) => ({
+          provider: p.provider,
+          data: aggregatePoints(p.data, labelFn),
+        }))
+        .filter((p) => p.data.some((d) => d.totalTokens > 0));
+
+      const result = { global, providers };
       setCache(cacheKey, result);
       return result;
+    } catch {
+      return { global: [], providers: [] };
     }
-
-    const labelFn = granularity === 'week' ? getWeekLabel : getMonthLabel;
-    const global = aggregatePoints(globalDaily, labelFn);
-    const providers = providersDaily
-      .map((p) => ({
-        provider: p.provider,
-        data: aggregatePoints(p.data, labelFn),
-      }))
-      .filter((p) => p.data.some((d) => d.totalTokens > 0));
-
-    const result = { global, providers };
-    setCache(cacheKey, result);
-    return result;
   }
 
   async checkQuota(): Promise<QuotaStatus> {
@@ -485,47 +545,50 @@ export class KVUsageStorage implements UsageStorage {
     const date = today();
     const month = thisMonth();
 
-    const [dailyUsed, monthlyUsed] = await Promise.all([
-      (kv.get(`quota:daily:${date}`) as Promise<number | null>).then((v) => v || 0),
-      (kv.get(`quota:monthly:${month}`) as Promise<number | null>).then((v) => v || 0),
-    ]);
+    try {
+      const [dailyUsed, monthlyUsed] = await withTimeout(
+        Promise.all([
+          (kv.get(`quota:daily:${date}`) as Promise<number | null>).then((v) => v || 0),
+          (kv.get(`quota:monthly:${month}`) as Promise<number | null>).then((v) => v || 0),
+        ]),
+        1000,
+        [0, 0] as [number, number],
+        'checkQuota'
+      );
 
-    let result: QuotaStatus;
-    if (dailyLimit > 0 && dailyUsed >= dailyLimit) {
-      const now = new Date();
-      const midnight = new Date(now);
-      midnight.setUTCHours(24, 0, 0, 0);
-      const retryAfter = Math.ceil((midnight.getTime() - now.getTime()) / 1000);
-      result = { allowed: false, dailyUsed, dailyLimit, monthlyUsed, monthlyLimit, retryAfter };
-    } else if (monthlyLimit > 0 && monthlyUsed >= monthlyLimit) {
-      const now = new Date();
-      const nextMonth = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
-      const retryAfter = Math.ceil((nextMonth.getTime() - now.getTime()) / 1000);
-      result = { allowed: false, dailyUsed, dailyLimit, monthlyUsed, monthlyLimit, retryAfter };
-    } else {
-      result = { allowed: true, dailyUsed, dailyLimit, monthlyUsed, monthlyLimit };
-    }
+      let result: QuotaStatus;
+      if (dailyLimit > 0 && dailyUsed >= dailyLimit) {
+        const now = new Date();
+        const midnight = new Date(now);
+        midnight.setUTCHours(24, 0, 0, 0);
+        const retryAfter = Math.ceil((midnight.getTime() - now.getTime()) / 1000);
+        result = { allowed: false, dailyUsed, dailyLimit, monthlyUsed, monthlyLimit, retryAfter };
+      } else if (monthlyLimit > 0 && monthlyUsed >= monthlyLimit) {
+        const now = new Date();
+        const nextMonth = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
+        const retryAfter = Math.ceil((nextMonth.getTime() - now.getTime()) / 1000);
+        result = { allowed: false, dailyUsed, dailyLimit, monthlyUsed, monthlyLimit, retryAfter };
+      } else {
+        result = { allowed: true, dailyUsed, dailyLimit, monthlyUsed, monthlyLimit };
+      }
 
-    // Only cache "allowed" results to avoid stale blocks
-    if (result.allowed) {
-      setCache(cacheKey, result, 15_000); // 15s for quota (shorter than admin cache)
+      // Only cache "allowed" results to avoid stale blocks
+      if (result.allowed) {
+        setCache(cacheKey, result, 15_000); // 15s for quota (shorter than admin cache)
+      }
+      return result;
+    } catch {
+      return { allowed: true, dailyUsed: 0, dailyLimit, monthlyUsed: 0, monthlyLimit };
     }
-    return result;
   }
 
-  private async incrementQuota(kv: Awaited<ReturnType<typeof getKV>>): Promise<void> {
-    if (!kv) return;
-    try {
-      const date = today();
-      const month = thisMonth();
-      const dailyKey = `quota:daily:${date}`;
-      const monthlyKey = `quota:monthly:${month}`;
-      await Promise.all([
-        kv.incr(dailyKey).then(() => kv.expire(dailyKey, 86400 * 2)),
-        kv.incr(monthlyKey).then(() => kv.expire(monthlyKey, 86400 * 35)),
-      ]);
-    } catch {
-      // Non-critical
-    }
+  private incrementQuotaPromises(kv: any, date: string, month: string): Promise<unknown>[] {
+    if (!kv) return [];
+    const dailyKey = `quota:daily:${date}`;
+    const monthlyKey = `quota:monthly:${month}`;
+    return [
+      kv.incr(dailyKey).then(() => kv.expire(dailyKey, 86400 * 2)),
+      kv.incr(monthlyKey).then(() => kv.expire(monthlyKey, 86400 * 35)),
+    ];
   }
 }

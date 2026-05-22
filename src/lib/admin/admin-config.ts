@@ -4,6 +4,8 @@
 // Runtime overrides for fallback chains and API keys.
 // Falls back to source-code defaults when no KV override exists.
 
+import { withTimeout } from '@/lib/utils/timeout';
+
 let _kv: any = null;
 let _kvChecked = false;
 
@@ -44,7 +46,12 @@ export async function getFallbackChain(
   try {
     const kv = await getKV();
     if (kv) {
-      const raw = await kv.get(`${PREFIX.fallbacks}${providerName}`);
+      const raw = await withTimeout(
+        kv.get(`${PREFIX.fallbacks}${providerName}`),
+        1000,
+        null,
+        `getFallbackChain:${providerName}`
+      );
       if (raw) {
         const parsed = JSON.parse(raw as string);
         if (Array.isArray(parsed)) return parsed;
@@ -91,7 +98,12 @@ export async function getManagedKeys(providerName: string): Promise<string[] | n
   try {
     const kv = await getKV();
     if (kv) {
-      const raw = await kv.get(`${PREFIX.keys}${providerName}`);
+      const raw = await withTimeout(
+        kv.get(`${PREFIX.keys}${providerName}`),
+        1000,
+        null,
+        `getManagedKeys:${providerName}`
+      );
       if (raw) {
         const parsed = JSON.parse(raw as string);
         if (Array.isArray(parsed)) return parsed;
@@ -115,18 +127,33 @@ export async function getAllManagedKeys(): Promise<Record<string, string[]>> {
     const keys: string[] = [];
     let cursor = 0;
     do {
-      const result = await kv.scan(cursor, { match: 'admin:keys:*', count: 100 });
+      const result = await withTimeout(
+        kv.scan(cursor, { match: 'admin:keys:*', count: 100 }),
+        1000,
+        [0, []] as [number, string[]],
+        'getAllManagedKeys:scan'
+      );
       cursor = result[0];
       keys.push(...result[1]);
+      if (cursor === 0 || result[1].length === 0) {
+        break;
+      }
     } while (cursor !== 0);
 
     const out: Record<string, string[]> = {};
     if (keys.length > 0) {
-      const values = await Promise.all(keys.map((k: string) => kv.get(k)));
+      const values = await withTimeout(
+        Promise.all(keys.map((k: string) => kv.get(k))),
+        1000,
+        keys.map(() => null),
+        'getAllManagedKeys:getValues'
+      );
       for (let i = 0; i < keys.length; i++) {
         const provider = keys[i].replace('admin:keys:', '');
         try {
-          out[provider] = JSON.parse(values[i] as string);
+          if (values[i]) {
+            out[provider] = JSON.parse(values[i] as string);
+          }
         } catch {
           // skip malformed
         }
