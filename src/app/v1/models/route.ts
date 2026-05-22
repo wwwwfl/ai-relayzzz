@@ -18,8 +18,8 @@ const RELAY_CREATED = Math.floor(Date.now() / 1000);
 /**
  * Build the full models list from provider registry.
  */
-function getAllModels(): Array<ModelInfo & { owned_by: string; configured: boolean }> {
-  initAllKeyPools(PROVIDERS);
+async function getAllModels(): Promise<Array<ModelInfo & { owned_by: string; configured: boolean }>> {
+  await initAllKeyPools(PROVIDERS);
   const poolStats = getKeyPoolStats();
 
   const models: Array<ModelInfo & { owned_by: string; configured: boolean }> = [];
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const allModels = getAllModels();
+  const allModels = await getAllModels();
 
   // OpenAI-compatible response format
   return Response.json({

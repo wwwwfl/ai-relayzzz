@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   if (authErr) return authErr;
 
   // Eagerly init all provider pools
-  initAllKeyPools(PROVIDERS);
+  await initAllKeyPools(PROVIDERS);
   const poolStats = getKeyPoolStats();
 
   // Fetch global usage and per-provider usage in parallel

@@ -903,7 +903,14 @@ export default function AdminPage() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <LogoIcon size={38} />
-          <h1 style={{ fontSize: '1.8rem', margin: 0, fontWeight: 700, color: '#fff' }}>{t.title}</h1>
+          <div>
+            <h1 style={{ fontSize: '1.8rem', margin: 0, fontWeight: 700, color: '#fff' }}>{t.title}</h1>
+            {process.env.NEXT_PUBLIC_DEPLOY_TIME && (
+              <span style={{ fontSize: '0.72rem', color: '#9ca3af', display: 'block', marginTop: '0.15rem' }}>
+                {t.deployTime}: {new Date(process.env.NEXT_PUBLIC_DEPLOY_TIME).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')}
+              </span>
+            )}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <a

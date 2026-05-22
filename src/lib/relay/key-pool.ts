@@ -156,10 +156,10 @@ export function markCooldown(key: ApiKey): void {
  * Call this in admin/status endpoints so stats reflect all configured providers,
  * not just ones that have handled a request in this invocation.
  */
-export function initAllKeyPools(configs: Record<string, { envKeyField: string; name: string }>): void {
+export async function initAllKeyPools(configs: Record<string, { envKeyField: string; name: string }>): Promise<void> {
   for (const config of Object.values(configs)) {
     if (!keyPools.has(config.name)) {
-      initKeyPool(config as ProviderConfig);
+      await getKeyPool(config as ProviderConfig);
     }
   }
 }

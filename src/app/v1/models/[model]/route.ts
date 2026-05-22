@@ -18,8 +18,8 @@ const RELAY_CREATED = Math.floor(Date.now() / 1000);
 /**
  * Find a specific model by ID across all providers.
  */
-function findModel(modelId: string): (ModelInfo & { owned_by: string; configured: boolean }) | null {
-  initAllKeyPools(PROVIDERS);
+async function findModel(modelId: string): Promise<(ModelInfo & { owned_by: string; configured: boolean }) | null> {
+  await initAllKeyPools(PROVIDERS);
   const poolStats = getKeyPoolStats();
 
   for (const [providerId, config] of Object.entries(PROVIDERS)) {
@@ -63,7 +63,7 @@ export async function GET(
     }
   }
 
-  const model = findModel(modelId);
+  const model = await findModel(modelId);
   if (!model) {
     return Response.json(
       {

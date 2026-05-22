@@ -364,22 +364,7 @@ export default function OverviewTab({
                         <span style={{ fontFamily: 'monospace', color: '#f3f4f6', backgroundColor: '#1f2937', padding: '0.15rem 0.4rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.06)' }}>
                           key:{ke.keyHash.slice(0, 8)}
                         </span>
-                        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                          {Object.entries(ke.errors).map(([code, detail]) => {
-                            const explanation = ERROR_CODE_EXPLANATIONS[lang]?.[code] || '';
-                            return (
-                              <span key={code} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                                <span style={{ color: '#fca5a5' }}>HTTP {code} {explanation ? `(${explanation})` : ''}×{detail.count}</span>
-                                {detail.reason && (
-                                  <span style={{ color: '#6b7280' }}>
-                                    ({detail.reason})
-                                  </span>
-                                )}
-                              </span>
-                            );
-                          })}
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginLeft: 'auto' }}>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                           <button
                             onClick={() => onTestKey(p.id, ke.keyHash)}
                             disabled={operationLoading || testingHash !== null}
@@ -412,6 +397,21 @@ export default function OverviewTab({
                           >
                             {t.btnDeleteKey}
                           </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginLeft: '0.5rem' }}>
+                          {Object.entries(ke.errors).map(([code, detail]) => {
+                            const explanation = ERROR_CODE_EXPLANATIONS[lang]?.[code] || '';
+                            return (
+                              <span key={code} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                <span style={{ color: '#fca5a5' }}>HTTP {code} {explanation ? `(${explanation})` : ''}×{detail.count}</span>
+                                {detail.reason && (
+                                  <span style={{ color: '#6b7280' }}>
+                                    ({detail.reason})
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
                     ))}

@@ -11,7 +11,7 @@ export const runtime = 'edge';
 const startTime = Date.now();
 
 export async function GET() {
-  initAllKeyPools(PROVIDERS);
+  await initAllKeyPools(PROVIDERS);
   const poolStats = getKeyPoolStats();
 
   // Count configured and healthy providers

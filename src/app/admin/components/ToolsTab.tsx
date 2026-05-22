@@ -479,11 +479,16 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
                   cursor: 'pointer',
                 }}
               >
-                {testableModels.map((m) => (
-                  <option key={`${m.providerId}:${m.modelId}`} value={m.modelId}>
-                    [{m.providerName}] {m.displayName} ({m.modelId})
-                  </option>
-                ))}
+                {testableModels.map((m) => {
+                  const hasKey = m.keyCount > 0;
+                  const prefix = hasKey ? '🟢 ' : '⚠️ ';
+                  const suffix = hasKey ? '' : (lang === 'zh' ? ' (未配置密钥)' : ' (No Keys)');
+                  return (
+                    <option key={`${m.providerId}:${m.modelId}`} value={m.modelId}>
+                      {prefix}[{m.providerName}] {m.displayName} ({m.modelId}){suffix}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 

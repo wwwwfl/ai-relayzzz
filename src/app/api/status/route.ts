@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const showDetails = url.searchParams.get('detail') === '1';
 
-  initAllKeyPools(PROVIDERS);
+  await initAllKeyPools(PROVIDERS);
   const providerStats = getKeyPoolStats();
   const rateLimiterStats = getRateLimiterStats();
   const globalUsage = await usageStorage.getGlobalUsage();

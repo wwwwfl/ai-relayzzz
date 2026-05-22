@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   if (authResponse) return authResponse;
 
   // Eagerly init all provider pools so stats reflect all configured providers
-  initAllKeyPools(PROVIDERS);
+  await initAllKeyPools(PROVIDERS);
   const providerStats = getKeyPoolStats();
 
   // Fire all 4 KV queries in parallel instead of sequential awaits
