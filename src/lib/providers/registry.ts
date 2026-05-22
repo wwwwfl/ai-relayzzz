@@ -125,6 +125,18 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
       { id: 'mimo-v2.5-pro-coding', displayName: 'MiMo v2.5 Pro (Coding)', contextWindow: 128000, maxOutput: 16384, supportsStream: true, supportsTools: true },
     ],
   },
+  xiaomi_tudo: {
+    name: 'xiaomi_tudo',
+    displayName: 'xiaomi_tudo',
+    baseUrl: 'https://test.404888.xyz/v1',
+    modelPrefixes: ['mimo-v2.5-pro'],
+    headerFormat: 'openai',
+    envKeyField: 'XIAOMI_TUDO_KEYS',
+    envBaseUrlField: 'XIAOMI_TUDO_BASE_URL',
+    models: [
+      { id: 'mimo-v2.5-pro', displayName: 'MiMo-v2.5-Pro', contextWindow: 1048576, maxOutput: 32000, supportsStream: true }
+    ],
+  },
 };
 
 /** Known provider names (for usage trend queries etc.) */

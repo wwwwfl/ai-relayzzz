@@ -128,6 +128,9 @@ export function resolveFallbackModel(originalModel: string, targetProviderName: 
     case 'xiaomi_coding':
       return 'mimo-v2.5-pro-coding';
 
+    case 'xiaomi_tudo':
+      return 'mimo-v2.5-pro';
+
     case 'openai':
       if (
         lowerModel.startsWith('o1') ||
