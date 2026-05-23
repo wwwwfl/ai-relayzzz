@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
   const allProviders = await getAllProviders();
   // Eagerly init all provider pools so stats reflect all configured providers
-  await initAllKeyPools(allProviders);
+  await initAllKeyPools(allProviders, true);
   const providerStats = getKeyPoolStats();
 
   // Fire all 4 KV queries in parallel instead of sequential awaits

@@ -83,9 +83,9 @@ function initKeyPool(config: ProviderConfig): KeyPool {
  * Get the key pool for a provider, initializing if needed.
  * Checks KV for managed keys first; falls back to env vars.
  */
-export async function getKeyPool(config: ProviderConfig): Promise<KeyPool> {
+export async function getKeyPool(config: ProviderConfig, forceRefresh = false): Promise<KeyPool> {
   const existing = keyPools.get(config.name);
-  if (existing) {
+  if (existing && !forceRefresh) {
     // Periodically refresh managed keys (every 5 min)
     const lastRefresh = lastManagedRefresh.get(config.name) || 0;
     if (Date.now() - lastRefresh > MANAGED_KEY_REFRESH_MS) {
@@ -97,7 +97,7 @@ export async function getKeyPool(config: ProviderConfig): Promise<KeyPool> {
     }
     return existing;
   }
-  // First call — try managed keys, then env vars
+  // First call or force refresh — try managed keys, then env vars
   const managed = await loadManagedKeys(config.name);
   if (managed) {
     const pool: KeyPool = { provider: config.name, keys: managed, counter: 0 };
@@ -156,10 +156,10 @@ export function markCooldown(key: ApiKey): void {
  * Call this in admin/status endpoints so stats reflect all configured providers,
  * not just ones that have handled a request in this invocation.
  */
-export async function initAllKeyPools(configs: Record<string, { envKeyField: string; name: string }>): Promise<void> {
+export async function initAllKeyPools(configs: Record<string, { envKeyField: string; name: string }>, forceRefresh = false): Promise<void> {
   for (const config of Object.values(configs)) {
-    if (!keyPools.has(config.name)) {
-      await getKeyPool(config as ProviderConfig);
+    if (!keyPools.has(config.name) || forceRefresh) {
+      await getKeyPool(config as ProviderConfig, forceRefresh);
     }
   }
 }
