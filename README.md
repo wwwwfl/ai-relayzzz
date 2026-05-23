@@ -16,98 +16,93 @@
 
 ---
 
-### ✨ 特性
+## 目录
 
-- **多 Key 轮换** — Round-Robin + 429 自动退避
-- **多 Provider 路由** — OpenAI · Claude · DeepSeek · MiMo · 自定义
-- **多级 Fallback** — Provider → Key 链式故障转移
-- **熔断器** — Provider 故障时自动切换
-- **Admin 后台** — 全功能管理面板 `/admin`
-  - 密钥管理（添加 / 删除 / 测试连通性）
-  - 配额配置（动态覆盖，KV 持久化）
-  - 模型连通性测试
-  - 临时 API Key 生成（HMAC-SHA256 签名）
-  - 自定义 Provider 管理（CRUD）
-  - 实时 Key Pool 同步
-- **用量追踪** — 调用次数 + Token 用量（Vercel KV）
-- **流式响应** — SSE 透传，实时输出
-- **OpenAI 兼容** — 直接用 OpenAI SDK 对接
-- **密钥分离** — 区分 Admin Key / API Key / 临时 Key
-- **健康检查** — `/health` 端点用于监控
-- **虚拟模型映射** — 将虚拟模型名映射到真实模型
-- **一键部署** — 2 分钟内部署到 Vercel
-- 📢 **Webhook 通知推送** — 支持企微/飞书/钉钉/Slack，每日用量报告与超限告警
-- **📱 移动端适配** — 响应式管理后台，手机上也能随时调整中转策略
+- [特性](#-特性)
+- [5 分钟快速上手](#-5-分钟快速上手)
+- [使用方法](#-使用方法)
+- [配置参考](#-配置参考)
+- [架构概览](#-架构概览)
+- [Admin 后台](#-admin-后台)
+- [通知与告警](#-通知与告警)
+- [同类项目对比](#-同类项目对比)
+- [使用场景](#-使用场景)
+- [贡献指南](#-贡献指南)
+- [许可证](#-许可证)
 
-### 📸 截图展示
+## ✨ 特性
 
-**管理后台 — 运行概览**
+| 特性 | 说明 |
+|------|------|
+| **多 Key 轮换** | Round-Robin + 429 自动退避 |
+| **多 Provider 路由** | OpenAI · Claude · DeepSeek · MiMo · 自定义 |
+| **多级 Fallback** | Provider → Key 链式故障转移 |
+| **熔断器** | Provider 故障时自动切换 |
+| **Admin 后台** | 密钥管理、配额配置、用量统计、模型测试 |
+| **流式响应** | SSE 透传，实时输出 |
+| **Webhook 通知** | 企微 / 飞书 / 钉钉 / Slack，日报 + 超限告警 |
+| **临时 API Key** | HMAC-SHA256 无状态签名，自动过期 |
+| **虚拟模型映射** | 将虚拟模型名路由到真实 Provider |
+| **OpenAI 兼容** | 直接用 OpenAI SDK 对接，零改动 |
+| **一键部署** | 2 分钟部署到 Vercel，免费层即可 |
 
-![管理后台运行概览](docs/screenshots/admin-overview.png)
+## 🚀 5 分钟快速上手
 
-限额状态、今日消耗概览、Token 消耗趋势一目了然。
+> **前置条件：** [Vercel 账号](https://vercel.com/signup)（免费）+ 至少一个 AI Provider 的 API Key
 
-**管理后台 — 密钥管理**
+**第 1 步 — 部署**
 
-![管理后台密钥管理](docs/screenshots/admin-keys.png)
+点击上方 **Deploy with Vercel** 按钮，填入 3 个环境变量：
 
-多服务商密钥池，带状态指示和模型前缀映射。
+| 变量 | 说明 |
+|------|------|
+| `RELAY_API_KEY` | 客户端请求鉴权密钥（自定义强密码） |
+| `RELAY_ADMIN_KEY` | 后台管理登录密钥（可同上） |
+| `RELAY_SIGNING_SECRET` | 临时 Key 签名密钥（可同上） |
 
-**管理后台 — 辅助工具**
+点击 **Deploy**，等待部署完成。
 
-![管理后台辅助工具](docs/screenshots/admin-tools.png)
+**第 2 步 — 验证**
 
-临时密钥生成和模型连通性测试。
+```bash
+curl https://你的项目.vercel.app/health
+# → {"status":"ok"}
+```
 
-### 🚀 快速开始
+**第 3 步 — 添加密钥**
 
-#### 一键部署（推荐）
+1. 访问 `https://你的项目.vercel.app/admin`，用 `RELAY_ADMIN_KEY` 登录
+2. 进入 **Provider Keys**，添加你的 API Key（OpenAI、Claude 等）
 
-> **前置条件：** 一个 [Vercel 账号](https://vercel.com/signup)（免费版即可）+ 至少一个 AI Provider 的 API Key。
+**第 4 步 — 开始调用**
 
-1. 点击 README 顶部的 **Deploy with Vercel** 按钮
-2. 填写 3 个必需的环境变量：
-   - `RELAY_API_KEY` — 客户端请求鉴权密钥（自定义一个强密码即可）
-   - `RELAY_ADMIN_KEY` — 后台管理登录密钥（可以和上面相同）
-   - `RELAY_SIGNING_SECRET` — 临时 Key 签名密钥（可以和上面相同）
-3. 点击 **Deploy** — 搞定！
+```bash
+curl -X POST https://你的项目.vercel.app/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_RELAY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "你好！"}]}'
+```
 
-**部署后：**
-1. 访问 `https://你的项目.vercel.app/health` 确认服务正常
-2. 访问 `https://你的项目.vercel.app/admin`，用 `RELAY_ADMIN_KEY` 登录
-3. 在 **Provider Keys** 中添加你的 API Key（OpenAI、Claude 等）
-4. 开始调用！
+🎉 **完成！** 你已经拥有一个支持多 Provider、自动故障转移的 AI API 中转服务。
 
-#### 手动部署
+<details>
+<summary><strong>📦 本地开发</strong></summary>
 
 ```bash
 git clone https://github.com/ParsifalC/ai-relay.git
 cd ai-relay
 npm install
-
 cp .env.local.example .env.local
 # 编辑 .env.local 填入你的 API Keys
-
 npm run dev  # http://localhost:3000
-npx vercel   # 部署到 Vercel
 ```
 
-### 📖 使用方法
+</details>
 
-**端点：**
-```
-POST https://你的项目.vercel.app/v1/chat/completions
-```
+## 📖 使用方法
 
-**curl：**
-```bash
-curl -X POST https://你的项目.vercel.app/v1/chat/completions \
-  -H "Authorization: Bearer YOUR_R...KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "你好！"}]}'
-```
+### OpenAI SDK
 
-**OpenAI SDK：**
 ```python
 from openai import OpenAI
 
@@ -122,19 +117,33 @@ response = client.chat.completions.create(
 )
 ```
 
-**临时密钥：**
-在后台面板中生成指定有效期的临时密钥。
+### 流式响应
+
+```python
+stream = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "讲个故事"}],
+    stream=True
+)
+for chunk in stream:
+    print(chunk.choices[0].delta.content or "", end="")
+```
+
+### 临时密钥
+
+在 Admin 后台生成指定有效期的临时密钥：
 - **格式：** `***${base64Payload}.${signature}`
 - **校验：** Vercel Edge 服务端 HMAC-SHA256 无状态签名校验
+- **场景：** CI/CD 流水线、临时授权、API 分享
 
-### 🔧 配置
+## 🔧 配置参考
 
-#### 环境变量
+### 环境变量
 
 | 变量 | 说明 | 必填 |
 |------|------|------|
-| `RELAY_API_KEY` | 客户端请求鉴权密钥（逗号分隔） | ✅ |
-| `RELAY_ADMIN_KEY` | 后台管理登录密钥（逗号分隔，未设置则回退到 `RELAY_API_KEY`） | ⬜ |
+| `RELAY_API_KEY` | 客户端请求鉴权密钥（逗号分隔支持多个） | ✅ |
+| `RELAY_ADMIN_KEY` | 后台管理登录密钥（未设置则回退到 `RELAY_API_KEY`） | ⬜ |
 | `RELAY_SIGNING_SECRET` | 临时 Key 签名密钥（未设置则回退到管理/请求密钥） | ⬜ |
 | `OPENAI_KEYS` | OpenAI API Keys（逗号分隔） | ⬜ |
 | `CLAUDE_KEYS` | Anthropic API Keys | ⬜ |
@@ -142,19 +151,19 @@ response = client.chat.completions.create(
 | `XIAOMI_KEYS` | Xiaomi API Keys | ⬜ |
 
 > [!NOTE]
-> Provider 密钥（OPENAI_KEYS 等）建议通过 Admin 后台面板配置，而非 Vercel 环境变量。密钥存储在 Vercel KV 中，不暴露在代码仓库里。
+> Provider 密钥建议通过 Admin 后台配置（存储在 Vercel KV 中），而非写入环境变量。
 
-#### 支持的 Provider
+### 支持的 Provider
 
-| Provider | 模型 | 状态 |
-|----------|------|------|
-| OpenAI | gpt-4o, gpt-4, gpt-3.5-turbo, … | ✅ 内置 |
-| Anthropic (Claude) | claude-3.5-sonnet, claude-3-opus, … | ✅ 内置 |
-| DeepSeek | deepseek-chat, deepseek-coder, … | ✅ 内置 |
-| Xiaomi (MiMo) | mimo-7b, … | ✅ 内置 |
+| Provider | 模型示例 | 状态 |
+|----------|---------|------|
+| OpenAI | gpt-4o, gpt-4, gpt-3.5-turbo | ✅ 内置 |
+| Anthropic (Claude) | claude-3.5-sonnet, claude-3-opus | ✅ 内置 |
+| DeepSeek | deepseek-chat, deepseek-coder | ✅ 内置 |
+| Xiaomi (MiMo) | mimo-7b | ✅ 内置 |
 | 自定义 | 任意 OpenAI 兼容 API | ✅ 可配置 |
 
-### 🏗️ 架构
+## 🏗️ 架构概览
 
 ```
 Client → Edge Runtime (全球分发, <50ms 延迟)
@@ -164,119 +173,94 @@ Client → Edge Runtime (全球分发, <50ms 延迟)
               └─ Vercel KV (密钥, 配额, 用量)
 ```
 
-### 📊 Admin 后台
+## 📊 Admin 后台
 
 访问 `/admin` 使用 `RELAY_ADMIN_KEY` 登录：
 
 | 功能 | 说明 |
 |------|------|
-| **Provider Keys** | 管理所有 Provider 的 API 密钥 |
-| **配额配置** | 为每个 Provider 设置动态配额 |
-| **模型测试** | 测试特定模型的连通性 |
-| **临时密钥** | 生成有时效的 API 密钥 |
+| **Provider Keys** | 管理所有 Provider 的 API 密钥，支持连通性测试 |
+| **配额配置** | 为每个 Provider 设置动态配额，KV 持久化 |
+| **模型测试** | 测试特定模型的连通性和响应 |
+| **临时密钥** | 生成有时效的 HMAC-SHA256 签名 API 密钥 |
 | **自定义 Provider** | 添加 / 编辑 / 删除自定义 Provider |
-| **用量统计** | 查看请求次数和 Token 用量 |
+| **用量统计** | 请求次数 + Token 用量趋势图 |
 | **Key Pool 状态** | 实时同步所有密钥状态 |
-| **通知设置** | 配置 Webhook 推送、告警阈值、日报发送时间 |
+| **通知设置** | Webhook 推送、告警阈值、日报时间 |
 
-> 💡 **移动端友好**：Admin 后台采用响应式设计，在手机浏览器上也能流畅操作，随时随地调整中转策略、查看用量、管理密钥。
+> 💡 **移动端友好** — 响应式设计，手机上也能随时管理中转策略。
 
-### 📢 通知与告警
+## 📸 截图
 
-AI Relay 支持通过 Webhook 将每日用量报告和超限告警推送到你的团队协作平台。
+<details>
+<summary>点击展开截图</summary>
 
-#### 支持的平台
+**运行概览**
 
-| 平台 | 说明 |
+![管理后台运行概览](docs/screenshots/admin-overview.png)
+
+限额状态、今日消耗概览、Token 消耗趋势一目了然。
+
+**密钥管理**
+
+![管理后台密钥管理](docs/screenshots/admin-keys.png)
+
+多服务商密钥池，带状态指示和模型前缀映射。
+
+**辅助工具**
+
+![管理后台辅助工具](docs/screenshots/admin-tools.png)
+
+临时密钥生成和模型连通性测试。
+
+</details>
+
+## 📢 通知与告警
+
+支持通过 Webhook 推送每日用量报告和超限告警。
+
+| 平台 | 格式 |
 |------|------|
-| **企业微信** | 群机器人 Webhook，Markdown 格式 |
-| **飞书** | 自定义机器人，飞书消息卡片 |
-| **钉钉** | 群机器人 Webhook，Markdown 格式 |
-| **Slack** | Incoming Webhook，Block Kit 格式 |
-| **通用 Webhook** | 任意 HTTP 端点，可自定义 JSON 模板 |
+| 企业微信 | Markdown |
+| 飞书 | 消息卡片 |
+| 钉钉 | Markdown |
+| Slack | Block Kit |
+| 通用 Webhook | 自定义 JSON |
 
-#### 配置方法
+**配置：** Admin 后台 → 通知设置 → 添加 Webhook → 填入 URL → 启用
 
-1. 登录 Admin 后台，进入 **通知设置** Tab
-2. 点击「添加 Webhook」，选择平台类型
-3. 填入 Webhook URL（从对应平台的群机器人设置中获取）
-4. 启用后可点击「测试」验证连通性
+**每日报告：** Vercel Cron 定时发送，包含当日总量、Provider 分项、前日对比。
 
-#### 每日用量报告
+**超限告警：** 支持按 Provider 或全局设置请求量 / Token 量阈值。
 
-系统通过 Vercel Cron 每天定时发送用量日报，包含：
-- 当日总请求次数与 Token 消耗
-- 各 Provider 分项统计
-- 与前一日对比（增减百分比）
-
-报告默认发送时间：`21:00`（可在通知设置中调整，支持自定义时区）。
-
-#### 超限告警
-
-在通知设置中配置告警阈值：
-- **按 Provider 设置** — 为每个 Provider 分别设置日请求量 / Token 量上限
-- **全局阈值** — 使用 `*` 作为 Provider 名称设置全局阈值
-- 当实际用量超过阈值时，自动触发告警推送到所有已启用的 Webhook
-
-#### 测试连通性
-
-在 Admin 后台的通知设置中，每个 Webhook 配置旁都有「测试」按钮，点击后会发送一条测试消息，验证 Webhook URL 是否正常工作。
-
-### 🏁 同类项目对比
-
-AI Relay 的定位是**轻量级、自部署的中转层**，而非完整平台。以下是与主流方案的对比：
+## 🏁 同类项目对比
 
 | 特性 | AI Relay | OpenRouter | OneAPI / new-api | FastGPT |
 |------|----------|------------|------------------|---------|
-| **部署方式** | Vercel 一键部署（Edge） | 纯 SaaS | 自托管（Docker） | 自托管（Docker） |
-| **基础设施成本** | 免费（Vercel 免费层） | 按量付费 | 需要服务器 | 需要服务器 |
-| **冷启动** | < 50ms（Edge） | N/A（SaaS） | 秒级 | 秒级 |
-| **管理后台** | ✅ 内置 | ✅ Web 控制台 | ✅ Web 控制台 | ✅ Web 控制台 |
-| **多 Key 轮换** | ✅ Round-robin + 429 退避 | ✅ 托管式 | ✅ | ✅ |
-| **熔断器** | ✅ Provider 级别 | ❌ | ❌ | ❌ |
-| **Fallback 链** | ✅ Provider → Key（可配置） | ✅ 自动 | ✅ 基础 | ✅ 基础 |
+| **部署方式** | Vercel 一键（Edge） | 纯 SaaS | 自托管（Docker） | 自托管（Docker） |
+| **基础设施成本** | 免费 | 按量付费 | 需要服务器 | 需要服务器 |
+| **冷启动** | < 50ms | N/A | 秒级 | 秒级 |
+| **熔断器** | ✅ | ❌ | ❌ | ❌ |
+| **Fallback 链** | ✅ 可配置 | ✅ 自动 | ✅ 基础 | ✅ 基础 |
 | **并发控制** | ✅ 令牌桶 + 队列 | 限流 | ❌ | ❌ |
-| **Webhook 告警** | ✅ 企业微信/飞书/钉钉/Slack | ❌ | ❌ | ✅ Webhook |
-| **虚拟模型映射** | ✅ | ✅ | ✅ | ✅ |
-| **临时 API Key** | ✅ HMAC-SHA256 签名 | ❌ | ✅ | ✅ |
-| **OpenAI 兼容** | ✅ | ✅ | ✅ | 部分 |
-| **主要场景** | 个人 / 小团队中转 | API 市场 | 多 Key 管理 | 知识库 + API |
+| **Webhook 告警** | ✅ 4 平台 | ❌ | ❌ | ✅ |
+| **临时 API Key** | ✅ HMAC 签名 | ❌ | ✅ | ✅ |
+| **主要场景** | 个人 / 小团队 | API 市场 | 多 Key 管理 | 知识库 + API |
 
-**选择 AI Relay 的场景：**
-- 你想要一个**零成本、无服务器**的中转方案，2 分钟内部署完成
-- 你需要**多 Provider 故障转移**和熔断保护
-- 你偏好 **Edge Runtime** 带来的全球低延迟访问
-- 你不需要完整平台，只需要一个可靠的 API 代理层
+**选择 AI Relay：** 零成本、无服务器、2 分钟部署、多 Provider 故障转移、Edge 低延迟。
 
-**选择其他方案的场景：**
-- **OpenRouter**：你需要通过托管市场访问 100+ 模型，且希望内置计费功能
-- **OneAPI / new-api**：你需要成熟的自托管方案，有完善的 Token 管理和用户体系
-- **FastGPT**：你在构建知识库应用，需要集成 RAG 能力
-
-### 🙏 致谢与参考
-
-AI Relay 站在这些优秀开源项目的肩膀上：
-
-- **[OpenRouter](https://openrouter.ai)** — 开创了多 Provider API 聚合模式，证明统一端点能极大简化 AI 应用开发
-- **[OneAPI](https://github.com/songquanpeng/one-api) / [new-api](https://github.com/Calcium-Ion/new-api)** — 最流行的开源 API 管理系统，我们的多 Key 轮换和配额管理设计受其启发
-- **[FastGPT](https://github.com/labring/FastGPT)** — 展示了 API 中转与知识库工作流的深度整合，我们的 Webhook 系统参考了其通知架构
-- **[Vercel](https://vercel.com)** — Edge Runtime 和 KV 存储让无服务器 AI 中转成为可能，零基础设施开销
-- **[OpenAI](https://platform.openai.com)** — OpenAI 兼容 API 标准已成为 LLM 服务的事实接口
-
-### 🎯 使用场景
+## 🎯 使用场景
 
 | 场景 | 说明 |
 |------|------|
-| **个人开发者** | 将多个 API Key 整合为单一端点；调试时不会因限流中断，自动 Key 轮换和故障转移保障连续性 |
-| **小团队 / 创业公司** | 团队共享一个中转实例，配合配额管理；Admin 后台提供用量可见性，无需暴露原始 API Key |
-| **CI/CD 流水线** | 使用 HMAC 签名的临时密钥为临时构建代理提供访问；密钥自动过期，无需手动清理 |
-| **多地域应用** | Edge Runtime 确保全球 < 50ms 延迟；熔断器在 Provider 区域性故障时防止级联失败 |
-| **成本优化** | 通过虚拟模型映射将请求路由到更便宜的 Provider（简单任务用 DeepSeek，复杂任务用 GPT-4o） |
-| **企业内部工具** | 作为内部 API 网关部署，配合企业微信/飞书/钉钉 Webhook 告警，实现用量监控和异常检测 |
+| **个人开发者** | 多 Key 整合为单一端点，自动轮换 + 故障转移 |
+| **小团队** | 共享中转实例，配额管理，Admin 可见性 |
+| **CI/CD** | HMAC 临时密钥，自动过期无需清理 |
+| **多地域应用** | Edge 全球 < 50ms，熔断防级联故障 |
+| **成本优化** | 虚拟模型映射，按任务复杂度路由 Provider |
+| **企业内部** | API 网关 + Webhook 告警，用量监控 |
 
----
-
-### 🤝 贡献
+## 🤝 贡献指南
 
 欢迎贡献！请随时提交 Pull Request。
 
@@ -286,6 +270,14 @@ AI Relay 站在这些优秀开源项目的肩膀上：
 4. 推送到分支 (`git push origin feature/amazing-feature`)
 5. 提交 Pull Request
 
-### 📄 许可证
+## 🙏 致谢
+
+- [OpenRouter](https://openrouter.ai) — 多 Provider API 聚合模式先驱
+- [OneAPI](https://github.com/songquanpeng/one-api) / [new-api](https://github.com/Calcium-Ion/new-api) — 最流行的开源 API 管理系统
+- [FastGPT](https://github.com/labring/FastGPT) — API 中转与知识库工作流整合
+- [Vercel](https://vercel.com) — Edge Runtime + KV 存储
+- [OpenAI](https://platform.openai.com) — OpenAI 兼容 API 标准
+
+## 📄 许可证
 
 本项目基于 MIT 许可证 — 详见 [LICENSE](LICENSE) 文件。

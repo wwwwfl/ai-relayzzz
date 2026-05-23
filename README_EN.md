@@ -16,98 +16,93 @@
 
 ---
 
-### ✨ Features
+## Table of Contents
 
-- **Multi-Key Rotation** — Round-Robin with automatic 429 backoff
-- **Multi-Provider Routing** — OpenAI · Claude · DeepSeek · MiMo · Custom
-- **Multi-Level Fallback** — Provider → Key chain failover
-- **Circuit Breaker** — Automatic failover when provider is down
-- **Admin Dashboard** — Full management panel at `/admin`
-  - Key management (add / delete / test connectivity)
-  - Quota configuration with KV persistence
-  - Model connectivity testing
-  - Temporary API key generation (HMAC-SHA256 signed)
-  - Custom provider management (CRUD)
-  - Real-time key pool sync
-- **Usage Tracking** — Request counts + token usage via Vercel KV
-- **Streaming Responses** — SSE pass-through for real-time output
-- **OpenAI Compatible** — Works directly with the OpenAI SDK
-- **Key Segregation** — Separate admin / API / temporary keys
-- **Health Check** — `/health` endpoint for monitoring
-- **Virtual Model Mapping** — Map virtual model names to real models
-- **One-Click Deploy** — Deploy to Vercel in under 2 minutes
-- 📢 **Webhook Notifications** — Daily usage reports & quota alerts via WeCom / Feishu / DingTalk / Slack
-- **📱 Mobile Friendly** — Responsive admin dashboard, manage relay strategies on the go
+- [Features](#-features)
+- [5-Minute Quick Start](#-5-minute-quick-start)
+- [Usage](#-usage)
+- [Configuration](#-configuration)
+- [Architecture](#-architecture)
+- [Admin Dashboard](#-admin-dashboard)
+- [Notifications & Alerts](#-notifications--alerts)
+- [Comparison](#-comparison-with-similar-projects)
+- [Use Cases](#-use-cases)
+- [Contributing](#-contributing)
+- [License](#-license)
 
-### 📸 Screenshots
+## ✨ Features
 
-**Admin Dashboard — Overview**
+| Feature | Description |
+|---------|-------------|
+| **Multi-Key Rotation** | Round-Robin with automatic 429 backoff |
+| **Multi-Provider Routing** | OpenAI · Claude · DeepSeek · MiMo · Custom |
+| **Multi-Level Fallback** | Provider → Key chain failover |
+| **Circuit Breaker** | Automatic failover when provider is down |
+| **Admin Dashboard** | Key management, quota config, usage stats, model testing |
+| **Streaming Responses** | SSE pass-through for real-time output |
+| **Webhook Notifications** | WeCom / Feishu / DingTalk / Slack — daily reports + alerts |
+| **Temp API Keys** | HMAC-SHA256 stateless signing, auto-expiring |
+| **Virtual Model Mapping** | Route virtual model names to real providers |
+| **OpenAI Compatible** | Drop-in replacement for the OpenAI SDK |
+| **One-Click Deploy** | Deploy to Vercel in 2 minutes, free tier works |
 
-![Admin Dashboard Overview](docs/screenshots/admin-overview.png)
+## 🚀 5-Minute Quick Start
 
-Quota status, daily usage stats, and token consumption trends at a glance.
+> **Prerequisites:** [Vercel account](https://vercel.com/signup) (free) + at least one AI provider API key
 
-**Admin Dashboard — Key Management**
+**Step 1 — Deploy**
 
-![Admin Dashboard Key Management](docs/screenshots/admin-keys.png)
+Click the **Deploy with Vercel** button above, fill in 3 environment variables:
 
-Multi-provider key pool with status indicators and model prefix mapping.
+| Variable | Description |
+|----------|-------------|
+| `RELAY_API_KEY` | Client request auth key (choose any strong secret) |
+| `RELAY_ADMIN_KEY` | Admin dashboard login key (can be the same) |
+| `RELAY_SIGNING_SECRET` | Secret for signing temporary keys (can be the same) |
 
-**Admin Dashboard — Tools**
+Click **Deploy** and wait for it to finish.
 
-![Admin Dashboard Tools](docs/screenshots/admin-tools.png)
+**Step 2 — Verify**
 
-Temporary key generation and model connectivity testing.
+```bash
+curl https://your-project.vercel.app/health
+# → {"status":"ok"}
+```
 
-### 🚀 Quick Start
+**Step 3 — Add Keys**
 
-#### One-Click Deploy (Recommended)
+1. Visit `https://your-project.vercel.app/admin`, log in with `RELAY_ADMIN_KEY`
+2. Go to **Provider Keys**, add your API keys (OpenAI, Claude, etc.)
 
-> **Prerequisites:** A [Vercel account](https://vercel.com/signup) (free tier works) and at least one AI provider API key.
+**Step 4 — Start Making Requests**
 
-1. Click the **Deploy with Vercel** button at the top of this README
-2. Fill in the 3 required environment variables:
-   - `RELAY_API_KEY` — Client request auth key (choose any strong secret)
-   - `RELAY_ADMIN_KEY` — Admin dashboard login key (can be the same as above)
-   - `RELAY_SIGNING_SECRET` — Secret for signing temporary keys (can be the same as above)
-3. Click **Deploy** — done!
+```bash
+curl -X POST https://your-project.vercel.app/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_RELAY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello!"}]}'
+```
 
-**After Deployment:**
-1. Visit `https://your-project.vercel.app/health` to verify it's running
-2. Visit `https://your-project.vercel.app/admin` and log in with your `RELAY_ADMIN_KEY`
-3. Go to **Provider Keys** and add your API keys (OpenAI, Claude, etc.)
-4. Start making requests!
+🎉 **Done!** You now have a multi-provider AI API relay with automatic failover.
 
-#### Manual Setup
+<details>
+<summary><strong>📦 Local Development</strong></summary>
 
 ```bash
 git clone https://github.com/ParsifalC/ai-relay.git
 cd ai-relay
 npm install
-
 cp .env.local.example .env.local
 # Edit .env.local and fill in your API keys
-
 npm run dev  # http://localhost:3000
-npx vercel   # deploy to Vercel
 ```
 
-### 📖 Usage
+</details>
 
-**Endpoint:**
-```
-POST https://your-project.vercel.app/v1/chat/completions
-```
+## 📖 Usage
 
-**curl:**
-```bash
-curl -X POST https://your-project.vercel.app/v1/chat/completions \
-  -H "Authorization: Bearer YOUR_R...KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello!"}]}'
-```
+### OpenAI SDK
 
-**OpenAI SDK:**
 ```python
 from openai import OpenAI
 
@@ -122,39 +117,53 @@ response = client.chat.completions.create(
 )
 ```
 
-**Temporary Keys:**
-Generate time-limited keys in the Admin panel.
+### Streaming
+
+```python
+stream = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Tell me a story"}],
+    stream=True
+)
+for chunk in stream:
+    print(chunk.choices[0].delta.content or "", end="")
+```
+
+### Temporary Keys
+
+Generate time-limited keys from the Admin dashboard:
 - **Format:** `***${base64Payload}.${signature}`
 - **Validation:** Stateless HMAC-SHA256 verification on Vercel Edge
+- **Use cases:** CI/CD pipelines, temporary access, API sharing
 
-### 🔧 Configuration
+## 🔧 Configuration
 
-#### Environment Variables
+### Environment Variables
 
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `RELAY_API_KEY` | Client request auth key (comma-separated) | ✅ |
-| `RELAY_ADMIN_KEY` | Admin dashboard login key (comma-separated, falls back to `RELAY_API_KEY`) | ⬜ |
-| `RELAY_SIGNING_SECRET` | Temporary key signing secret (falls back to admin/api key) | ⬜ |
+| `RELAY_ADMIN_KEY` | Admin login key (falls back to `RELAY_API_KEY`) | ⬜ |
+| `RELAY_SIGNING_SECRET` | Temp key signing secret (falls back to admin/api key) | ⬜ |
 | `OPENAI_KEYS` | OpenAI API Keys (comma-separated) | ⬜ |
 | `CLAUDE_KEYS` | Anthropic API Keys | ⬜ |
 | `DEEPSEEK_KEYS` | DeepSeek API Keys | ⬜ |
 | `XIAOMI_KEYS` | Xiaomi API Keys | ⬜ |
 
 > [!NOTE]
-> Provider keys (OPENAI_KEYS, etc.) are configured via the Admin panel after deployment, not as Vercel environment variables. Keys are stored in Vercel KV, not in your repo.
+> Provider keys are best configured via the Admin panel (stored in Vercel KV), not as environment variables.
 
-#### Supported Providers
+### Supported Providers
 
-| Provider | Models | Status |
-|----------|--------|--------|
-| OpenAI | gpt-4o, gpt-4, gpt-3.5-turbo, … | ✅ Built-in |
-| Anthropic (Claude) | claude-3.5-sonnet, claude-3-opus, … | ✅ Built-in |
-| DeepSeek | deepseek-chat, deepseek-coder, … | ✅ Built-in |
-| Xiaomi (MiMo) | mimo-7b, … | ✅ Built-in |
+| Provider | Example Models | Status |
+|----------|---------------|--------|
+| OpenAI | gpt-4o, gpt-4, gpt-3.5-turbo | ✅ Built-in |
+| Anthropic (Claude) | claude-3.5-sonnet, claude-3-opus | ✅ Built-in |
+| DeepSeek | deepseek-chat, deepseek-coder | ✅ Built-in |
+| Xiaomi (MiMo) | mimo-7b | ✅ Built-in |
 | Custom | Any OpenAI-compatible API | ✅ Configurable |
 
-### 🏗️ Architecture
+## 🏗️ Architecture
 
 ```
 Client → Edge Runtime (global, <50ms latency)
@@ -164,119 +173,94 @@ Client → Edge Runtime (global, <50ms latency)
               └─ Vercel KV (keys, quotas, usage)
 ```
 
-### 📊 Admin Dashboard
+## 📊 Admin Dashboard
 
 Access at `/admin` with your `RELAY_ADMIN_KEY`:
 
 | Feature | Description |
 |---------|-------------|
-| **Provider Keys** | Manage API keys for all providers |
-| **Quota Config** | Set dynamic quotas per provider |
-| **Model Testing** | Test connectivity to specific models |
-| **Temporary Keys** | Generate time-limited API keys |
+| **Provider Keys** | Manage API keys with connectivity testing |
+| **Quota Config** | Dynamic per-provider quotas, KV-persisted |
+| **Model Testing** | Test connectivity and response for specific models |
+| **Temporary Keys** | Generate HMAC-SHA256 signed time-limited keys |
 | **Custom Providers** | Add / edit / delete custom providers |
-| **Usage Stats** | View request counts and token usage |
-| **Key Pool Status** | Real-time sync status of all keys |
-| **Notification Settings** | Configure Webhook push, alert thresholds, report schedule |
+| **Usage Stats** | Request counts + token usage trends |
+| **Key Pool Status** | Real-time sync of all key states |
+| **Notification Settings** | Webhook config, alert thresholds, report schedule |
 
-> 💡 **Mobile Friendly**: The admin dashboard features a responsive design, allowing you to adjust relay strategies, view usage, and manage keys from your phone anytime, anywhere.
+> 💡 **Mobile Friendly** — Responsive design, manage relay strategies on the go.
 
-### 📢 Notifications & Alerts
+## 📸 Screenshots
 
-AI Relay supports pushing daily usage reports and quota alerts to your team collaboration platforms via Webhooks.
+<details>
+<summary>Click to expand</summary>
 
-#### Supported Platforms
+**Overview**
 
-| Platform | Description |
-|----------|-------------|
-| **WeCom** | Group bot Webhook, Markdown format |
-| **Feishu** | Custom bot, Feishu message card |
-| **DingTalk** | Group bot Webhook, Markdown format |
-| **Slack** | Incoming Webhook, Block Kit format |
-| **Generic Webhook** | Any HTTP endpoint with customizable JSON template |
+![Admin Dashboard Overview](docs/screenshots/admin-overview.png)
 
-#### Configuration
+Quota status, daily usage stats, and token consumption trends at a glance.
 
-1. Log in to the Admin dashboard, go to the **Notification Settings** tab
-2. Click "Add Webhook" and select the platform type
-3. Enter the Webhook URL (obtain from the corresponding platform's group bot settings)
-4. Once enabled, click "Test" to verify connectivity
+**Key Management**
 
-#### Daily Usage Reports
+![Admin Dashboard Key Management](docs/screenshots/admin-keys.png)
 
-The system sends daily usage reports via Vercel Cron at a scheduled time, including:
-- Total requests and token consumption for the day
-- Per-provider breakdown
-- Comparison with the previous day (percentage change)
+Multi-provider key pool with status indicators and model prefix mapping.
 
-Default report time: `21:00` (adjustable in notification settings, supports custom timezone).
+**Tools**
 
-#### Quota Alerts
+![Admin Dashboard Tools](docs/screenshots/admin-tools.png)
 
-Configure alert thresholds in notification settings:
-- **Per-Provider** — Set daily request/token limits for each provider individually
-- **Global Threshold** — Use `*` as the provider name to set a global threshold
-- When actual usage exceeds the threshold, alerts are automatically sent to all enabled Webhooks
+Temporary key generation and model connectivity testing.
 
-#### Test Connectivity
+</details>
 
-In the Admin dashboard's notification settings, each Webhook configuration has a "Test" button. Click it to send a test message and verify the Webhook URL is working correctly.
+## 📢 Notifications & Alerts
 
-### 🏁 Comparison with Similar Projects
+Push daily usage reports and quota alerts via Webhooks.
 
-AI Relay is a **lightweight, self-deployable relay layer** — not a full platform. Here's how it differs from other popular solutions:
+| Platform | Format |
+|----------|--------|
+| WeCom | Markdown |
+| Feishu | Message card |
+| DingTalk | Markdown |
+| Slack | Block Kit |
+| Generic Webhook | Custom JSON |
+
+**Setup:** Admin dashboard → Notification Settings → Add Webhook → Enter URL → Enable
+
+**Daily Reports:** Sent via Vercel Cron with daily totals, per-provider breakdown, and day-over-day comparison.
+
+**Quota Alerts:** Per-provider or global thresholds for requests / tokens.
+
+## 🏁 Comparison with Similar Projects
 
 | Feature | AI Relay | OpenRouter | OneAPI / new-api | FastGPT |
 |---------|----------|------------|------------------|---------|
 | **Deployment** | Vercel one-click (Edge) | SaaS only | Self-hosted (Docker) | Self-hosted (Docker) |
-| **Infra Cost** | Free (Vercel free tier) | Pay-per-use | Requires server | Requires server |
-| **Cold Start** | < 50ms (Edge) | N/A (SaaS) | Seconds | Seconds |
-| **Admin UI** | ✅ Built-in | ✅ Web dashboard | ✅ Web dashboard | ✅ Web dashboard |
-| **Multi-Key Rotation** | ✅ Round-robin + 429 backoff | ✅ Managed | ✅ | ✅ |
-| **Circuit Breaker** | ✅ Provider-level | ❌ | ❌ | ❌ |
-| **Fallback Chains** | ✅ Provider → Key (configurable) | ✅ Auto | ✅ Basic | ✅ Basic |
-| **Concurrency Control** | ✅ Token bucket + queue | Rate-limited | ❌ | ❌ |
-| **Webhook Alerts** | ✅ WeCom/Feishu/DingTalk/Slack | ❌ | ❌ | ✅ Webhook |
-| **Virtual Model Mapping** | ✅ | ✅ | ✅ | ✅ |
-| **Temp API Keys** | ✅ HMAC-SHA256 signed | ❌ | ✅ | ✅ |
-| **OpenAI Compatible** | ✅ | ✅ | ✅ | Partial |
-| **Primary Use Case** | Personal / small team relay | API marketplace | Multi-key management | Knowledge base + API |
+| **Infra Cost** | Free | Pay-per-use | Requires server | Requires server |
+| **Cold Start** | < 50ms | N/A | Seconds | Seconds |
+| **Circuit Breaker** | ✅ | ❌ | ❌ | ❌ |
+| **Fallback Chains** | ✅ Configurable | ✅ Auto | ✅ Basic | ✅ Basic |
+| **Concurrency** | ✅ Token bucket + queue | Rate-limited | ❌ | ❌ |
+| **Webhook Alerts** | ✅ 4 platforms | ❌ | ❌ | ✅ |
+| **Temp API Keys** | ✅ HMAC signed | ❌ | ✅ | ✅ |
+| **Primary Use Case** | Personal / small team | API marketplace | Multi-key mgmt | Knowledge base + API |
 
-**When to choose AI Relay:**
-- You want a **zero-cost, serverless** relay that deploys in 2 minutes
-- You need **multi-provider fallback** with circuit breaker protection
-- You prefer **Edge Runtime** for global low-latency access
-- You don't need a full platform — just a reliable API proxy layer
+**Choose AI Relay:** Zero-cost, serverless, 2-minute deploy, multi-provider failover, Edge low-latency.
 
-**When to choose alternatives:**
-- **OpenRouter**: You want access to 100+ models via a managed marketplace with billing built in
-- **OneAPI / new-api**: You need a mature self-hosted solution with extensive token management and user systems
-- **FastGPT**: You're building a knowledge-base application and need integrated RAG capabilities
-
-### 🙏 Acknowledgments & References
-
-AI Relay stands on the shoulders of these excellent open-source projects:
-
-- **[OpenRouter](https://openrouter.ai)** — Pioneered the multi-provider API aggregation model; demonstrated that unified endpoints dramatically simplify AI application development
-- **[OneAPI](https://github.com/songquanpeng/one-api) / [new-api](https://github.com/Calcium-Ion/new-api)** — The go-to open-source API management system; inspired our multi-key rotation and quota management design
-- **[FastGPT](https://github.com/labring/FastGPT)** — Showed how API relay can be tightly integrated with knowledge-base workflows; our webhook system draws from their notification architecture
-- **[Vercel](https://vercel.com)** — Edge Runtime and KV storage make serverless AI relay possible with zero infrastructure overhead
-- **[OpenAI](https://platform.openai.com)** — The OpenAI-compatible API standard has become the de facto interface for LLM services
-
-### 🎯 Use Cases
+## 🎯 Use Cases
 
 | Scenario | Description |
 |----------|-------------|
-| **Individual Developers** | Consolidate multiple API keys into a single endpoint; never hit rate limits mid-debugging thanks to automatic key rotation and fallback |
-| **Small Teams / Startups** | Share a relay instance across the team with quota management; admin dashboard provides visibility without exposing raw API keys |
-| **CI/CD Pipelines** | Use temporary HMAC-signed keys for ephemeral build agents; keys auto-expire, no cleanup needed |
-| **Multi-Region Apps** | Edge Runtime ensures < 50ms latency worldwide; circuit breaker prevents cascading failures when a provider has regional outages |
-| **Cost Optimization** | Route requests to cheaper providers (e.g., DeepSeek for simple tasks, GPT-4o for complex ones) via virtual model mapping |
-| **Enterprise Internal Tools** | Deploy as an internal API gateway with webhook alerts to WeCom/Feishu/DingTalk for usage monitoring and anomaly detection |
+| **Individual Developers** | Consolidate multiple keys into one endpoint with auto-rotation and failover |
+| **Small Teams** | Shared relay instance with quota management and admin visibility |
+| **CI/CD Pipelines** | HMAC temp keys that auto-expire, no cleanup needed |
+| **Multi-Region Apps** | Edge < 50ms globally, circuit breaker prevents cascading failures |
+| **Cost Optimization** | Virtual model mapping routes tasks to cheaper providers |
+| **Enterprise Internal** | API gateway + webhook alerts for usage monitoring |
 
----
-
-### 🤝 Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -286,8 +270,14 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-### 📄 License
+## 🙏 Acknowledgments
+
+- [OpenRouter](https://openrouter.ai) — Pioneered multi-provider API aggregation
+- [OneAPI](https://github.com/songquanpeng/one-api) / [new-api](https://github.com/Calcium-Ion/new-api) — The go-to open-source API management system
+- [FastGPT](https://github.com/labring/FastGPT) — API relay + knowledge base workflow integration
+- [Vercel](https://vercel.com) — Edge Runtime + KV storage
+- [OpenAI](https://platform.openai.com) — The OpenAI-compatible API standard
+
+## 📄 License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
-
----
