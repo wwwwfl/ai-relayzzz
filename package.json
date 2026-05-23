@@ -10,7 +10,10 @@
     "type-check": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ci:local": "bash scripts/ci-local.sh"
   },
   "dependencies": {
     "@vercel/kv": "^1.0.1",
@@ -26,7 +29,10 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "drizzle-kit": "^0.30.0",
-    "typescript": "^5.5.0"
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.35",
+    "typescript": "^5.5.0",
+    "vitest": "^3.2.4"
   },
   "engines": {
     "node": ">=18"
