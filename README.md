@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ AI Relay
+<img src="docs/assets/logo-banner.svg" alt="AI Relay" width="400">
 
 **基于 Vercel Edge Runtime 的轻量级开源 AI API 中转服务**
 
@@ -197,19 +197,19 @@ Client → Edge Runtime (全球分发, <50ms 延迟)
 
 **运行概览**
 
-![管理后台运行概览](docs/screenshots/admin-overview.png)
+![管理后台运行概览](docs/assets/screenshots/admin-overview.png)
 
 限额状态、今日消耗概览、Token 消耗趋势一目了然。
 
 **密钥管理**
 
-![管理后台密钥管理](docs/screenshots/admin-keys.png)
+![管理后台密钥管理](docs/assets/screenshots/admin-keys.png)
 
 多服务商密钥池，带状态指示和模型前缀映射。
 
 **辅助工具**
 
-![管理后台辅助工具](docs/screenshots/admin-tools.png)
+![管理后台辅助工具](docs/assets/screenshots/admin-tools.png)
 
 临时密钥生成和模型连通性测试。
 

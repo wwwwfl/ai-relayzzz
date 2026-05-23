@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bolt-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="hex-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="glow-grad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#00f2fe" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.1"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="#8b5cf6" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background circle glow -->
+  <circle cx="256" cy="256" r="240" fill="url(#glow-grad)"/>
+  
+  <!-- Hexagon outline -->
+  <polygon 
+    points="256,40 456,156 456,356 256,472 56,356 56,156" 
+    stroke="url(#hex-grad)" 
+    stroke-width="16" 
+    stroke-linejoin="round" 
+    fill="none"
+    filter="url(#shadow)"
+    opacity="0.9"
+  />
+  
+  <!-- Node dots at vertices -->
+  <circle cx="256" cy="40" r="18" fill="#00f2fe" filter="url(#glow)"/>
+  <circle cx="456" cy="156" r="18" fill="#3b82f6" filter="url(#glow)"/>
+  <circle cx="456" cy="356" r="18" fill="#8b5cf6" filter="url(#glow)"/>
+  <circle cx="256" cy="472" r="18" fill="#8b5cf6" filter="url(#glow)"/>
+  <circle cx="56" cy="356" r="18" fill="#8b5cf6" filter="url(#glow)"/>
+  <circle cx="56" cy="156" r="18" fill="#3b82f6" filter="url(#glow)"/>
+  
+  <!-- Lightning bolt -->
+  <path 
+    d="M290 80 L160 264 H240 L224 432 L352 248 H272 L290 80 Z" 
+    fill="url(#bolt-grad)" 
+    filter="url(#glow)"
+    stroke-linejoin="round"
+  />
+  
+  <!-- Inner bolt highlight -->
+  <path 
+    d="M280 110 L180 256 H244 L232 396 L332 256 H270 L280 110 Z" 
+    fill="white" 
+    opacity="0.15"
+  />
+</svg>

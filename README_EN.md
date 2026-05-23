@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ AI Relay
+<img src="docs/assets/logo-banner.svg" alt="AI Relay" width="400">
 
 **A lightweight, open-source AI API relay service built on Vercel Edge Runtime**
 
@@ -197,19 +197,19 @@ Access at `/admin` with your `RELAY_ADMIN_KEY`:
 
 **Overview**
 
-![Admin Dashboard Overview](docs/screenshots/admin-overview.png)
+![Admin Dashboard Overview](docs/assets/screenshots/admin-overview.png)
 
 Quota status, daily usage stats, and token consumption trends at a glance.
 
 **Key Management**
 
-![Admin Dashboard Key Management](docs/screenshots/admin-keys.png)
+![Admin Dashboard Key Management](docs/assets/screenshots/admin-keys.png)
 
 Multi-provider key pool with status indicators and model prefix mapping.
 
 **Tools**
 
-![Admin Dashboard Tools](docs/screenshots/admin-tools.png)
+![Admin Dashboard Tools](docs/assets/screenshots/admin-tools.png)
 
 Temporary key generation and model connectivity testing.
 
