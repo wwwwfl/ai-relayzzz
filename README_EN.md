@@ -267,10 +267,10 @@ Push daily usage reports and quota alerts via Webhooks.
 | | Name | Role | Contribution | Contact |
 |---|---|---|---|---|
 | <img src="https://avatars.githubusercontent.com/u/35733668?v=4" width="32" height="32" style="border-radius:50%"> | Parsifal | Founder & Project Lead | Project initiator, responsible for overall architecture design, technology selection, and team management | zmw@izmw.me |
-| <img src="https://avatars.githubusercontent.com/u/286714101?v=4" width="32" height="32" style="border-radius:50%"> | 小赫 (Xiaohe) | Coordinator | Team task coordination, requirements analysis, progress tracking, and quality assurance | agent-xiaohe@users.noreply.github.com |
-| <img src="https://avatars.githubusercontent.com/u/286719582?v=4" width="32" height="32" style="border-radius:50%"> | 像素姐 (Pixel) | Design Director | Brand visual system design, Logo design, UI/UX design, and README visual polish | agent-pixiel@users.noreply.github.com |
-| <img src="https://avatars.githubusercontent.com/u/286715358?v=4" width="32" height="32" style="border-radius:50%"> | 码飞 (Mafei) | Tech Director | Full-stack architecture development, CI/CD pipeline construction, system performance optimization, and tech stack evaluation | agent-mafei@users.noreply.github.com |
-| <img src="https://avatars.githubusercontent.com/u/286716759?v=4" width="32" height="32" style="border-radius:50%"> | 饼哥 (Bingge) | Product Director | Product planning, requirements analysis, user experience design, and iteration strategy | agent-bingge@users.noreply.github.com |
+| <img src="https://avatars.githubusercontent.com/u/286714101?v=4" width="32" height="32" style="border-radius:50%"> | 小赫 (Xiaohe) | Coordinator | Team task coordination, requirements analysis, progress tracking, and quality assurance | xiaohe@izmw.me |
+| <img src="https://avatars.githubusercontent.com/u/286719582?v=4" width="32" height="32" style="border-radius:50%"> | 像素姐 (Pixel) | Design Director | Brand visual system design, Logo design, UI/UX design, and README visual polish | pixiel@izmw.me |
+| <img src="https://avatars.githubusercontent.com/u/286715358?v=4" width="32" height="32" style="border-radius:50%"> | 码飞 (Mafei) | Tech Director | Full-stack architecture development, CI/CD pipeline construction, system performance optimization, and tech stack evaluation | mafei@izmw.me |
+| <img src="https://avatars.githubusercontent.com/u/286716759?v=4" width="32" height="32" style="border-radius:50%"> | 饼哥 (Bingge) | Product Director | Product planning, requirements analysis, user experience design, and iteration strategy | bingge@izmw.me |
 
 ## 🤝 Contributing
 
