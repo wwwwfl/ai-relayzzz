@@ -147,22 +147,22 @@ describe('KV command optimization', () => {
     });
   });
 
-  it('tracks quota usage counters even when no quota limit is configured', async () => {
+  it('does not reserve quota counters when no quota limit is configured', async () => {
     installMockKV();
     const storage = new KVUsageStorage();
 
     await expect(storage.checkQuota(true)).resolves.toMatchObject({
       allowed: true,
-      dailyUsed: 1,
+      dailyUsed: 0,
       dailyLimit: 0,
-      monthlyUsed: 1,
+      monthlyUsed: 0,
       monthlyLimit: 0,
     });
     await expect(storage.checkQuota()).resolves.toMatchObject({
       allowed: true,
-      dailyUsed: 1,
+      dailyUsed: 0,
       dailyLimit: 0,
-      monthlyUsed: 1,
+      monthlyUsed: 0,
       monthlyLimit: 0,
     });
   });

@@ -761,6 +761,62 @@ export class KVUsageStorage implements UsageStorage {
     }
   }
 
+  async getMonthlyUsage(): Promise<{
+    requests: number;
+    tokens: number;
+    promptTokens: number;
+    completionTokens: number;
+  } | null> {
+    const month = thisMonth();
+    const cacheKey = `monthlyUsage:${month}:${today()}`;
+    const cached = getCached<{
+      requests: number;
+      tokens: number;
+      promptTokens: number;
+      completionTokens: number;
+    }>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const kv = await getKV();
+      if (!kv) return null;
+
+      const nowBeijing = getBeijingDate();
+      const dayOfMonth = nowBeijing.getUTCDate();
+      const dates = dateRange(dayOfMonth);
+
+      const p = kv.pipeline();
+      for (const date of dates) {
+        p.hgetall(kvKeys.usageDaily(date));
+      }
+
+      const rawResults = await withTimeout(
+        p.exec(),
+        1000,
+        [],
+        'getMonthlyUsage:pipeline'
+      );
+
+      const result = {
+        requests: 0,
+        tokens: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+      };
+      for (const raw of rawResults as Array<Record<string, unknown> | null>) {
+        result.requests += Number(raw?.requests || 0);
+        result.tokens += Number(raw?.tokens || 0);
+        result.promptTokens += Number(raw?.promptTokens || 0);
+        result.completionTokens += Number(raw?.completionTokens || 0);
+      }
+
+      setCache(cacheKey, result);
+      return result;
+    } catch {
+      return null;
+    }
+  }
+
   async getUsageTrend(
     range: string,
     granularity: 'day' | 'week' | 'month' = 'day'
@@ -871,7 +927,7 @@ export class KVUsageStorage implements UsageStorage {
     }
 
     const kv = await getKV();
-    if (!kv) {
+    if (!kv || (!dailyLimit && !monthlyLimit)) {
       return { allowed: true, dailyUsed: 0, dailyLimit, monthlyUsed: 0, monthlyLimit, isOverride };
     }
 

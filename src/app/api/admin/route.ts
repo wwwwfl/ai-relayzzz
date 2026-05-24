@@ -34,8 +34,9 @@ export async function GET(request: NextRequest) {
   const providerStats = getKeyPoolStats();
 
   // Fire all 4 KV queries in parallel instead of sequential awaits
-  const [globalUsage, quota, errorStats, keyErrors] = await Promise.all([
+  const [globalUsage, monthlyUsage, quota, errorStats, keyErrors] = await Promise.all([
     usageStorage.getGlobalUsage(),
+    usageStorage.getMonthlyUsage(),
     usageStorage.checkQuota(),
     usageStorage.getErrorStats(),
     usageStorage.getKeyErrors(),
@@ -82,14 +83,18 @@ export async function GET(request: NextRequest) {
     };
   });
 
+  const usageRequests = globalUsage?.requests || 0;
+  const dailyQuotaUsed = quota.dailyLimit > 0 ? quota.dailyUsed : usageRequests;
+  const monthlyQuotaUsed = quota.monthlyLimit > 0 ? quota.monthlyUsed : (monthlyUsage?.requests || usageRequests);
+
   return Response.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     providers: providersWithErrors,
     usage: globalUsage || { requests: 0, tokens: 0, promptTokens: 0, completionTokens: 0, providers: {} },
     quota: {
-      daily: { used: quota.dailyUsed, limit: quota.dailyLimit || 'unlimited' },
-      monthly: { used: quota.monthlyUsed, limit: quota.monthlyLimit || 'unlimited' },
+      daily: { used: dailyQuotaUsed, limit: quota.dailyLimit || 'unlimited' },
+      monthly: { used: monthlyQuotaUsed, limit: quota.monthlyLimit || 'unlimited' },
       allowed: quota.allowed,
       isOverride: quota.isOverride || false,
     },

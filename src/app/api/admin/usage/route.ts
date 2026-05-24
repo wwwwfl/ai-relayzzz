@@ -30,8 +30,9 @@ export async function GET(request: NextRequest) {
   const poolStats = getKeyPoolStats();
 
   // Fetch global usage and per-provider usage in parallel
-  const [globalUsage, quota, errorStats] = await Promise.all([
+  const [globalUsage, monthlyUsage, quota, errorStats] = await Promise.all([
     usageStorage.getGlobalUsage(),
+    usageStorage.getMonthlyUsage(),
     usageStorage.checkQuota(),
     usageStorage.getErrorStats(),
   ]);
@@ -62,6 +63,10 @@ export async function GET(request: NextRequest) {
     };
   });
 
+  const usageRequests = globalUsage?.requests || 0;
+  const dailyQuotaUsed = quota.dailyLimit > 0 ? quota.dailyUsed : usageRequests;
+  const monthlyQuotaUsed = quota.monthlyLimit > 0 ? quota.monthlyUsed : (monthlyUsage?.requests || usageRequests);
+
   return Response.json({
     timestamp: new Date().toISOString(),
     global: {
@@ -71,8 +76,8 @@ export async function GET(request: NextRequest) {
       completionTokens: globalUsage?.completionTokens || 0,
     },
     quota: {
-      daily: { used: quota.dailyUsed, limit: quota.dailyLimit || 'unlimited' },
-      monthly: { used: quota.monthlyUsed, limit: quota.monthlyLimit || 'unlimited' },
+      daily: { used: dailyQuotaUsed, limit: quota.dailyLimit || 'unlimited' },
+      monthly: { used: monthlyQuotaUsed, limit: quota.monthlyLimit || 'unlimited' },
       allowed: quota.allowed,
     },
     providers,
