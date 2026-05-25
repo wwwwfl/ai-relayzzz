@@ -75,28 +75,7 @@ export const apiKeys = pgTable('api_keys', {
   index('api_keys_org_idx').on(table.orgId),
 ]);
 
-// ── 5. Request Logs ─────────────────────────────────────────
-
-export const requestLogs = pgTable('request_logs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  apiKeyId: uuid('api_key_id').references(() => apiKeys.id),
-  provider: text('provider').notNull(),
-  model: text('model').notNull(),
-  statusCode: integer('status_code').notNull(),
-  promptTokens: integer('prompt_tokens').notNull().default(0),
-  completionTokens: integer('completion_tokens').notNull().default(0),
-  totalTokens: integer('total_tokens').notNull().default(0),
-  latencyMs: integer('latency_ms'),                    // upstream response time
-  isStream: integer('is_stream').notNull().default(0), // boolean
-  metadata: jsonb('metadata'),                          // extensible JSON field
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [
-  index('request_logs_api_key_idx').on(table.apiKeyId),
-  index('request_logs_provider_idx').on(table.provider),
-  index('request_logs_created_at_idx').on(table.createdAt),
-]);
-
-// ── 6. Usage Quotas ─────────────────────────────────────────
+// ── 5. Usage Quotas ─────────────────────────────────────────
 
 export const usageQuotas = pgTable('usage_quotas', {
   id: uuid('id').primaryKey().defaultRandom(),

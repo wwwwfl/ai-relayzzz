@@ -19,9 +19,6 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'setup' | 'overview' | 'keys' | 'health' | 'logs' | 'tools' | 'webhooks'>('setup');
   const [setupData, setSetupData] = useState<any>(null);
   const [providerHealthData, setProviderHealthData] = useState<any>(null);
-  const [requestLogsData, setRequestLogsData] = useState<any>(null);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [providerFilter, setProviderFilter] = useState('');
   const [v21Loading, setV21Loading] = useState(false);
 
   const t = TRANSLATIONS[lang];
@@ -175,24 +172,13 @@ export default function AdminPage() {
     }
   };
 
-  const fetchRequestLogs = async () => {
-    setV21Loading(true);
-    try {
-      const params = new URLSearchParams({ status: statusFilter, limit: '100' });
-      if (providerFilter.trim()) params.set('provider', providerFilter.trim());
-      setRequestLogsData(await adminFetch(`/api/admin/request-logs?${params.toString()}`));
-    } finally {
-      setV21Loading(false);
-    }
-  };
-
   useEffect(() => {
     if (!authenticated) return;
     if (activeTab === 'setup') fetchSetup().catch((e) => setError(e instanceof Error ? e.message : String(e)));
     if (activeTab === 'health') fetchProviderHealth().catch((e) => setError(e instanceof Error ? e.message : String(e)));
-    if (activeTab === 'logs') fetchRequestLogs().catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    // logs tab manages its own data fetching + localStorage
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authenticated, activeTab, statusFilter]);
+  }, [authenticated, activeTab]);
 
   if (!authenticated) {
     return (
@@ -522,13 +508,6 @@ export default function AdminPage() {
         {activeTab === 'logs' && (
           <RequestLogsTab
             t={t}
-            data={requestLogsData}
-            loading={v21Loading}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            providerFilter={providerFilter}
-            setProviderFilter={setProviderFilter}
-            onRefresh={fetchRequestLogs}
           />
         )}
         {activeTab === 'tools' && (

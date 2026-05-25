@@ -14,6 +14,4 @@ export const kvKeys = {
   legacyKeyDaily: (keyHash: string, date: string) => `usage:${keyHash}:daily:${date}`,
   legacyKeyTotal: (keyHash: string) => `usage:${keyHash}:total`,
   legacyErrorKeyDaily: (keyHash: string, date: string) => `error:key:${keyHash}:${date}`,
-  requestLogsIndex: () => 'request:logs:index',
-  requestLog: (traceId: string) => `request:log:${traceId}`,
 } as const;
