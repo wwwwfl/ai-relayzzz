@@ -12,6 +12,8 @@ import UsageReportTab from './components/UsageReportTab';
 import RequestLogsTab from './components/RequestLogsTab';
 import ModelAliasesTab from './components/ModelAliasesTab';
 import PriorityRulesTab from './components/PriorityRulesTab';
+import SecurityTab from './components/SecurityTab';
+import RoutingTab from './components/RoutingTab';
 import type { AdminData, PriorityRule, PriorityRuleConflict } from './types';
 import { TRANSLATIONS } from './translations';
 import { useAdminHandlers } from './adminHandlers';
@@ -19,7 +21,7 @@ import { useAdminHandlers } from './adminHandlers';
 export default function AdminPage() {
   const [apiKey, setApiKey] = useState('');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
-  const [activeTab, setActiveTab] = useState<'setup' | 'overview' | 'keys' | 'models' | 'priority' | 'health' | 'usage' | 'logs' | 'tools' | 'webhooks'>('setup');
+  const [activeTab, setActiveTab] = useState<'setup' | 'overview' | 'keys' | 'models' | 'priority' | 'health' | 'routing' | 'security' | 'usage' | 'logs' | 'tools' | 'webhooks'>('setup');
   const [setupData, setSetupData] = useState<any>(null);
   const [providerHealthData, setProviderHealthData] = useState<any>(null);
   const [priorityRules, setPriorityRules] = useState<PriorityRule[]>([]);
@@ -494,6 +496,18 @@ export default function AdminPage() {
           {t.tabHealth}
         </button>
         <button
+          className={`tab-btn ${activeTab === 'routing' ? 'active' : ''}`}
+          onClick={() => setActiveTab('routing')}
+        >
+          {lang === 'zh' ? '⚡ 智能路由' : '⚡ Routing'}
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'security' ? 'active' : ''}`}
+          onClick={() => setActiveTab('security')}
+        >
+          {lang === 'zh' ? '🛡️ Key安全' : '🛡️ Key Security'}
+        </button>
+        <button
           className={`tab-btn ${activeTab === 'usage' ? 'active' : ''}`}
           onClick={() => setActiveTab('usage')}
         >
@@ -610,6 +624,18 @@ export default function AdminPage() {
             data={providerHealthData}
             loading={v21Loading}
             onRefresh={() => fetchProviderHealth(true)}
+          />
+        )}
+        {activeTab === 'security' && (
+          <SecurityTab
+            apiKey={apiKey}
+            lang={lang}
+          />
+        )}
+        {activeTab === 'routing' && (
+          <RoutingTab
+            apiKey={apiKey}
+            lang={lang}
           />
         )}
         {activeTab === 'usage' && (
