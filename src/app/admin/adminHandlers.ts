@@ -257,6 +257,58 @@ export function useAdminHandlers(apiKey: string, t: any) {
     }
   }, [selectedProvider, newKeyInput, apiKey, t]);
 
+  const handleTestAndAddKey = useCallback(async (model?: string) => {
+    if (!selectedProvider || !newKeyInput.trim()) return;
+    const inputKeys = newKeyInput.split(/\r?\n/).map((key) => key.trim()).filter(Boolean);
+    if (inputKeys.length !== 1) return;
+    setTestingInput(true);
+    setConfigMessage(null);
+    try {
+      // Step 1: Test
+      const testRes = await fetch(`/api/admin/providers/${selectedProvider}/keys/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ key: newKeyInput.trim(), model }),
+      });
+      const testData = await testRes.json();
+      if (!testRes.ok) {
+        throw new Error(testData.error?.message || t.alertVerificationRequestFailed);
+      }
+      if (!testData.valid) {
+        const details = testData.error ? `: ${testData.error}` : '';
+        setConfigMessage({ text: `${t.alertTestFailed}${details}`, type: 'error' });
+        return;
+      }
+      // Step 2: Add
+      setTestingInput(false);
+      setOperationLoading(true);
+      const addRes = await fetch(`/api/admin/providers/${selectedProvider}/keys`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ key: newKeyInput.trim() }),
+      });
+      const addData = await addRes.json();
+      if (!addRes.ok) {
+        throw new Error(addData.error?.message || t.alertAddFailed);
+      }
+      setNewKeyInput('');
+      setConfigMessage({ text: t.msgKeyAdded, type: 'success' });
+      await fetchProviderConfig(selectedProvider);
+      await fetchData(true);
+    } catch (e) {
+      setConfigMessage({ text: e instanceof Error ? e.message : t.alertTestError, type: 'error' });
+    } finally {
+      setTestingInput(false);
+      setOperationLoading(false);
+    }
+  }, [selectedProvider, newKeyInput, apiKey, t, fetchProviderConfig, fetchData]);
+
   const handleSaveFallbacks = useCallback(async (newChain: string[]) => {
     if (!selectedProvider) return;
     setOperationLoading(true);
@@ -482,6 +534,7 @@ export function useAdminHandlers(apiKey: string, t: any) {
     handleDeleteKeyGeneral,
     handleTestKeyGeneral,
     handleTestInputKey,
+    handleTestAndAddKey,
     handleSaveFallbacks,
     handleResetFallbacks,
     handleSaveQuota,

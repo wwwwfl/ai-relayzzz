@@ -49,6 +49,7 @@ export default function AdminPage() {
     handleDeleteKeyGeneral,
     handleTestKeyGeneral,
     handleTestInputKey,
+    handleTestAndAddKey,
     handleSaveFallbacks,
     handleResetFallbacks,
     handleSaveQuota,
@@ -570,6 +571,7 @@ export default function AdminPage() {
             onDeleteKey={handleDeleteKeyGeneral}
             onTestKey={handleTestKeyGeneral}
             onTestInputKey={handleTestInputKey}
+            onTestAndAddKey={handleTestAndAddKey}
             onSaveFallbacks={handleSaveFallbacks}
             onResetFallbacks={handleResetFallbacks}
             customProviderModalOpen={customProviderModalOpen}

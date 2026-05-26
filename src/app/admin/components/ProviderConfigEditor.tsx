@@ -32,6 +32,7 @@ interface ProviderConfigEditorProps {
   onDeleteKey: (providerId: string, hash: string) => Promise<void>;
   onTestKey: (providerId: string, hash: string, modelId?: string) => Promise<void>;
   onTestInputKey: (modelId?: string) => Promise<void>;
+  onTestAndAddKey: (modelId?: string) => Promise<void>;
   onSaveFallbacks: (newChain: string[]) => Promise<void>;
   onResetFallbacks: () => Promise<void>;
   setEditingCustomProvider: (val: any) => void;
@@ -62,6 +63,7 @@ export default function ProviderConfigEditor({
   onDeleteKey,
   onTestKey,
   onTestInputKey,
+  onTestAndAddKey,
   onSaveFallbacks,
   onResetFallbacks,
   setEditingCustomProvider,
@@ -327,6 +329,26 @@ export default function ProviderConfigEditor({
                 onMouseLeave={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'; }}
               >
                 {testingInput ? t.btnTestingKey : t.btnTestKey}
+              </button>
+              <button
+                onClick={() => onTestAndAddKey(selectedInputModel)}
+                disabled={operationLoading || testingInput || !newKeyInput.trim() || !canTestInputKey}
+                style={{
+                  padding: '0.6rem 1rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#7c3aed',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '0.9rem',
+                  cursor: operationLoading || testingInput || !newKeyInput.trim() || !canTestInputKey ? 'not-allowed' : 'pointer',
+                  opacity: operationLoading || testingInput || !newKeyInput.trim() || !canTestInputKey ? 0.5 : 1,
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#6d28d9'; }}
+                onMouseLeave={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#7c3aed'; }}
+              >
+                {testingInput ? t.btnTestingKey : t.btnTestAndAddKey}
               </button>
               <button
                 onClick={onAddKey}

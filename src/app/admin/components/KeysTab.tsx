@@ -35,6 +35,7 @@ interface KeysTabProps {
   onDeleteKey: (providerId: string, hash: string) => Promise<void>;
   onTestKey: (providerId: string, hash: string, modelId?: string) => Promise<void>;
   onTestInputKey: (modelId?: string) => Promise<void>;
+  onTestAndAddKey: (modelId?: string) => Promise<void>;
   onSaveFallbacks: (newChain: string[]) => Promise<void>;
   onResetFallbacks: () => Promise<void>;
   customProviderModalOpen: boolean;
@@ -71,6 +72,7 @@ export default function KeysTab(props: KeysTabProps) {
     onDeleteKey,
     onTestKey,
     onTestInputKey,
+    onTestAndAddKey,
     onSaveFallbacks,
     onResetFallbacks,
     customProviderModalOpen,
@@ -166,6 +168,7 @@ export default function KeysTab(props: KeysTabProps) {
         onDeleteKey={onDeleteKey}
         onTestKey={onTestKey}
         onTestInputKey={onTestInputKey}
+        onTestAndAddKey={onTestAndAddKey}
         onSaveFallbacks={onSaveFallbacks}
         onResetFallbacks={onResetFallbacks}
         setEditingCustomProvider={setEditingCustomProvider}
