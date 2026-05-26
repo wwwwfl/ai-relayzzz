@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { ToastProvider } from './components/Toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 export const metadata: Metadata = {
   title: 'AI Relay — Serverless AI API Relay Gateway',
@@ -18,7 +20,11 @@ export default function RootLayout({
         backgroundColor: '#0a0a0f',
         color: '#e0e0e0',
       }}>
-        {children}
+        <ErrorBoundary>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

@@ -12,6 +12,7 @@ import UsageReportTab from './components/UsageReportTab';
 import RequestLogsTab from './components/RequestLogsTab';
 import ModelAliasesTab from './components/ModelAliasesTab';
 import PriorityRulesTab from './components/PriorityRulesTab';
+import { ErrorDetailPanel } from '../components/ErrorDetailPanel';
 import type { AdminData, PriorityRule, PriorityRuleConflict } from './types';
 import { TRANSLATIONS } from './translations';
 import { useAdminHandlers } from './adminHandlers';
@@ -454,6 +455,17 @@ export default function AdminPage() {
           </button>
         </div>
       </div>
+
+      {/* Error detail panel — shows when structured API errors occur */}
+      {error && authenticated && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <ErrorDetailPanel
+            statusCode={error.includes('401') ? 401 : error.includes('429') ? 429 : 500}
+            message={error === 'unauthorized' ? t.invalidKey : (error === 'failed_fetch' ? t.failedFetch : error)}
+            onRetry={() => { setError(null); fetchData(true); }}
+          />
+        </div>
+      )}
 
       {/* Tabs list */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
