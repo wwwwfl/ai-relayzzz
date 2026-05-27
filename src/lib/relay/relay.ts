@@ -4,7 +4,7 @@
 
 import type { ChatCompletionRequest } from '../types';
 import type { RelayResult, ProviderConfig, ApiKey } from '../providers/types';
-import { resolveProvider, getUpstreamUrl, resolveModelAlias, resolveFallbackModel, resolveUpstreamModel, getAllProviders } from '../providers';
+import { resolveProvider, getUpstreamUrl, getUpstreamResponsesUrl, resolveModelAlias, resolveFallbackModel, resolveUpstreamModel, getAllProviders } from '../providers';
 import { selectKey, markCooldown, getKeyPool } from './key-pool';
 import { buildHeaders, transformToAnthropic } from './transform';
 import { RelayError } from '../errors';
@@ -34,8 +34,8 @@ function recordError(
 }
 
 /**
- * Core relay function — forwards a chat completion request to the upstream provider.
- * Supports both streaming and non-streaming.
+ * Core relay function — forwards a request to the upstream provider.
+ * Supports both streaming and non-streaming, and both Chat Completions and Responses API.
  *
  * 429 protection layers:
  * 1. Token bucket — proactive rate limiting before the request
@@ -44,12 +44,21 @@ function recordError(
  * 4. Key rotation — switch to next available key on 429/5xx
  */
 export async function relayRequest(
-  body: ChatCompletionRequest
+  body: ChatCompletionRequest,
+  apiType: 'chat' | 'responses' = 'chat'
 ): Promise<RelayResult> {
   const provider = await resolveProvider(body.model);
   if (!provider) {
     throw new RelayError(
       `Unknown model: ${body.model}. Supported prefixes: gpt-, claude-, deepseek-, mimo-`,
+      'invalid_request_error',
+      400
+    );
+  }
+
+  if (apiType === 'responses' && provider.headerFormat === 'anthropic') {
+    throw new RelayError(
+      `Responses API is not supported for Anthropic-format providers (${provider.displayName}). Only OpenAI-compatible providers support /v1/responses.`,
       'invalid_request_error',
       400
     );
@@ -103,7 +112,7 @@ export async function relayRequest(
 
       // Try primary provider with retries (with concurrency control)
       primaryResult = await withConcurrency(
-        () => tryProviderWithRetries(effectiveProvider, body, apiKey, maxRetries)
+        () => tryProviderWithRetries(effectiveProvider, body, apiKey, maxRetries, apiType)
       );
       if (primaryResult.result) {
         // Record success for smart routing
@@ -159,8 +168,15 @@ export async function relayRequest(
     // If an explicit model was specified in the fallback entry, override the request model
     const fbBody = explicitModel ? { ...body, model: explicitModel } : body;
 
+    // Skip Anthropic-format providers for Responses API (they don't support it)
+    if (apiType === 'responses' && fbProvider.headerFormat === 'anthropic') {
+      console.warn(`[fallback] ${fbProvider.displayName} does not support Responses API, skipping`);
+      errors.push({ provider: fbProvider.displayName, error: 'Responses API not supported (Anthropic format)' });
+      continue;
+    }
+
     const fbResult = await withConcurrency(
-      () => tryProviderWithRetries(fbProvider, fbBody, fbKey, fbMaxRetries)
+      () => tryProviderWithRetries(fbProvider, fbBody, fbKey, fbMaxRetries, apiType)
     );
     if (fbResult.result) {
       // Record success for smart routing
@@ -188,7 +204,8 @@ async function tryProviderWithRetries(
   provider: ProviderConfig,
   body: ChatCompletionRequest,
   initialKey: ApiKey | null,
-  maxRetries: number
+  maxRetries: number,
+  apiType: 'chat' | 'responses' = 'chat'
 ): Promise<{ result: RelayResult | null; lastError: Error | null }> {
   let currentKey = initialKey;
   let lastError: Error | null = null;
@@ -215,7 +232,6 @@ async function tryProviderWithRetries(
       }
     }
 
-    const url = getUpstreamUrl(provider);
     const isAnthropic = provider.headerFormat === 'anthropic';
 
     // Resolve target model and its alias for the current provider
@@ -225,15 +241,28 @@ async function tryProviderWithRetries(
     const resolvedModel = resolveUpstreamModel(resolvedAlias, provider);
 
     // Transform request body if needed (use resolved model name)
-    // Inject stream_options.include_usage for streaming so upstream returns usage in final SSE chunk
-    const bodyWithResolvedModel: Record<string, unknown> = { ...body, model: resolvedModel };
-    if (body.stream && !isAnthropic) {
-      const existingOpts = typeof body.stream_options === 'object' && body.stream_options !== null ? body.stream_options : {};
-      bodyWithResolvedModel.stream_options = { include_usage: true, ...existingOpts };
+    // For Responses API: pass body directly (no Anthropic transform — Responses API is OpenAI-only)
+    // For Chat API: inject stream_options and optionally transform to Anthropic format
+    let requestBody: Record<string, unknown>;
+    if (apiType === 'responses') {
+      requestBody = { ...body, model: resolvedModel };
+    } else {
+      const bodyWithResolvedModel: Record<string, unknown> = { ...body, model: resolvedModel };
+      if (body.stream && !isAnthropic) {
+        const existingOpts = typeof body.stream_options === 'object' && body.stream_options !== null ? body.stream_options : {};
+        bodyWithResolvedModel.stream_options = { include_usage: true, ...existingOpts };
+      }
+      requestBody = isAnthropic ? transformToAnthropic(bodyWithResolvedModel as ChatCompletionRequest) : bodyWithResolvedModel;
     }
-    const requestBody = isAnthropic ? transformToAnthropic(bodyWithResolvedModel as ChatCompletionRequest) : bodyWithResolvedModel;
 
     const startTime = Date.now();
+    let url: string;
+    try {
+      url = apiType === 'responses' ? getUpstreamResponsesUrl(provider) : getUpstreamUrl(provider);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      break;
+    }
     try {
       const upstreamResponse = await fetch(url, {
         method: 'POST',
@@ -298,13 +327,14 @@ async function tryProviderWithRetries(
       return { result: { response: upstreamResponse, provider, apiKey: currentKey }, lastError };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      // Record failure for smart routing
       recordProviderResult(provider.name, false, Date.now() - startTime);
-      await markCooldown(currentKey);
-      const nextKey = await selectKey(provider);
-      if (nextKey && nextKey.hash !== currentKey.hash) {
-        currentKey = nextKey;
-        continue;
+      if (currentKey) {
+        await markCooldown(currentKey);
+        const nextKey = await selectKey(provider);
+        if (nextKey && nextKey.hash !== currentKey.hash) {
+          currentKey = nextKey;
+          continue;
+        }
       }
     }
   }
