@@ -8,6 +8,11 @@
 
 （暂无）
 
+## [2.6.0] - 2026-05-28
+
+### Added
+- **Anthropic Messages API 中继**：新增 `/v1/messages` 端点，支持 Claude 原生 Anthropic Messages 协议，Claude 客户端可直接将 `base_url` 指向 Relay 使用原生协议通信。只路由到 `headerFormat: anthropic` 的供应商，上游 Key 使用 `CLAUDE_KEYS` 或 Admin 后台配置的 Claude 供应商密钥。
+
 ## [2.5.0] - 2026-05-27
 
 ### Added
