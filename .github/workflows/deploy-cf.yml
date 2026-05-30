@@ -71,11 +71,12 @@ jobs:
           if [ -n "$DATABASE_ID" ]; then
             echo "D1 database_id: $DATABASE_ID"
             # Update wrangler.toml with database_id
-            sed -i.bak "/database_name = \"ai-relay\"/a\\
-database_id = \"$DATABASE_ID\"" wrangler.toml || \
-            sed -i '' "/database_name = \"ai-relay\"/a\\
-database_id = \"$DATABASE_ID\"
-" wrangler.toml
+            if grep -q "database_id" wrangler.toml; then
+              sed -i.bak "s/database_id = .*/database_id = \"$DATABASE_ID\"/" wrangler.toml
+            else
+              sed -i.bak "/database_name = \"ai-relay\"/a\\
+database_id = \"$DATABASE_ID\"" wrangler.toml
+            fi
           fi
 
           # Check and create KV namespace if not exists, then extract id
@@ -92,11 +93,12 @@ database_id = \"$DATABASE_ID\"
           if [ -n "$KV_ID" ]; then
             echo "KV namespace id: $KV_ID"
             # Update wrangler.toml with KV id
-            sed -i.bak "/binding = \"KV\"/a\\
-id = \"$KV_ID\"" wrangler.toml || \
-            sed -i '' "/binding = \"KV\"/a\\
-id = \"$KV_ID\"
-" wrangler.toml
+            if grep -q "id = " wrangler.toml; then
+              sed -i.bak "s/id = .*/id = \"$KV_ID\"/" wrangler.toml
+            else
+              sed -i.bak "/binding = \"KV\"/a\\
+id = \"$KV_ID\"" wrangler.toml
+            fi
           fi
 
           echo "Updated wrangler.toml:"
