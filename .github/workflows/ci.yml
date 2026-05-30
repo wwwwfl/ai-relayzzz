@@ -12,24 +12,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
 
   type-check:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run type-check
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run type-check
 
   build:
     name: Build
@@ -37,12 +41,14 @@ jobs:
     needs: [lint, type-check]
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
         env:
           # Next.js build doesn't need live DB, but drizzle may need a placeholder
           DATABASE_URL: postgresql://localhost:5432/dummy
