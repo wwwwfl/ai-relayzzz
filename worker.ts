@@ -6,6 +6,8 @@
 // cron logic based on the schedule.
 // ============================================================
 
+/// <reference types="@cloudflare/workers-types" />
+
 interface Env {
   KV: KVNamespace;
   DB: D1Database;
