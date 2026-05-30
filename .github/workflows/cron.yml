@@ -1,0 +1,61 @@
+name: Scheduled Cron Jobs
+
+on:
+  schedule:
+    # Provider health probe — daily at 00:00 UTC
+    - cron: "0 0 * * *"
+    # Usage aggregation — daily at 00:05 UTC
+    - cron: "5 0 * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which cron job to run"
+        required: true
+        type: choice
+        options:
+          - probe
+          - usage
+          - all
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine which jobs to run
+        id: jobs
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "job=${{ inputs.job }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "0 0 * * *" ]; then
+            echo "job=probe" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "5 0 * * *" ]; then
+            echo "job=usage" >> "$GITHUB_OUTPUT"
+          else
+            echo "job=all" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Cron: Provider Health Probe"
+        if: steps.jobs.outputs.job == 'probe' || steps.jobs.outputs.job == 'all'
+        run: |
+          RESPONSE=$(curl -s -o /tmp/probe.json -w "%{http_code}" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.DEPLOY_URL }}/api/cron/probe")
+          echo "Status: $RESPONSE"
+          cat /tmp/probe.json | jq . 2>/dev/null || cat /tmp/probe.json
+          if [ "$RESPONSE" -ge 400 ]; then
+            echo "❌ Probe failed with HTTP $RESPONSE"
+            exit 1
+          fi
+
+      - name: "Cron: Daily Usage Aggregation"
+        if: steps.jobs.outputs.job == 'usage' || steps.jobs.outputs.job == 'all'
+        run: |
+          RESPONSE=$(curl -s -o /tmp/usage.json -w "%{http_code}" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.DEPLOY_URL }}/api/cron/usage")
+          echo "Status: $RESPONSE"
+          cat /tmp/usage.json | jq . 2>/dev/null || cat /tmp/usage.json
+          if [ "$RESPONSE" -ge 400 ]; then
+            echo "❌ Usage aggregation failed with HTTP $RESPONSE"
+            exit 1
+          fi
