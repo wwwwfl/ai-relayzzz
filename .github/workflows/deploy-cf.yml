@@ -74,7 +74,7 @@ jobs:
           fi
 
       - name: Build for Cloudflare Pages
-        run: pnpm exec opennextjs-cloudflare build
+        run: pnpm exec opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion
         env:
           NODE_ENV: production
 
