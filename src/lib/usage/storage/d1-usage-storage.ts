@@ -121,12 +121,31 @@ export class D1UsageStorage implements UsageStorage {
 
   async recordError(event: { provider: string; keyHash: string; statusCode: number; reason: string }): Promise<void> {
     try {
-      await this.db.prepare(
-        `INSERT INTO error_stats (date, provider, status_code, count, reason)
-         VALUES (?, ?, ?, 1, ?)
-         ON CONFLICT (date, provider, status_code) DO UPDATE SET
-           count = count + 1, reason = excluded.reason`
-      ).bind(today(), event.provider, String(event.statusCode), event.reason.slice(0, 200)).run();
+      const status = String(event.statusCode);
+      const reason = event.reason.slice(0, 200);
+      const stmts = [
+        this.db.prepare(
+          `INSERT INTO error_stats (date, provider, status_code, count, reason)
+           VALUES (?, ?, ?, 1, ?)
+           ON CONFLICT (date, provider, status_code) DO UPDATE SET
+             count = count + 1, reason = excluded.reason`
+        ).bind(today(), event.provider, status, reason),
+      ];
+
+      if (event.keyHash) {
+        stmts.push(
+          this.db.prepare(
+            `INSERT INTO error_key_stats (date, key_hash, provider, status_code, count, reason)
+             VALUES (?, ?, ?, ?, 1, ?)
+             ON CONFLICT (date, key_hash, status_code) DO UPDATE SET
+               provider = excluded.provider,
+               count = count + 1,
+               reason = excluded.reason`
+          ).bind(today(), event.keyHash, event.provider, status, reason)
+        );
+      }
+
+      await this.db.batch(stmts);
     } catch {
       // Non-critical
     }
@@ -135,12 +154,31 @@ export class D1UsageStorage implements UsageStorage {
   async recordErrorDirect(event: { provider: string; keyHash: string; statusCode: number; reason: string; count?: number }): Promise<void> {
     try {
       const count = event.count || 1;
-      await this.db.prepare(
-        `INSERT INTO error_stats (date, provider, status_code, count, reason)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT (date, provider, status_code) DO UPDATE SET
-           count = count + excluded.count, reason = excluded.reason`
-      ).bind(today(), event.provider, String(event.statusCode), count, event.reason.slice(0, 200)).run();
+      const status = String(event.statusCode);
+      const reason = event.reason.slice(0, 200);
+      const stmts = [
+        this.db.prepare(
+          `INSERT INTO error_stats (date, provider, status_code, count, reason)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT (date, provider, status_code) DO UPDATE SET
+             count = count + excluded.count, reason = excluded.reason`
+        ).bind(today(), event.provider, status, count, reason),
+      ];
+
+      if (event.keyHash) {
+        stmts.push(
+          this.db.prepare(
+            `INSERT INTO error_key_stats (date, key_hash, provider, status_code, count, reason)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT (date, key_hash, status_code) DO UPDATE SET
+               provider = excluded.provider,
+               count = count + excluded.count,
+               reason = excluded.reason`
+          ).bind(today(), event.keyHash, event.provider, status, count, reason)
+        );
+      }
+
+      await this.db.batch(stmts);
     } catch {
       // Non-critical
     }
@@ -317,7 +355,31 @@ export class D1UsageStorage implements UsageStorage {
   }
 
   async getKeyErrors(): Promise<Array<{ keyHash: string; errors: Record<string, { count: number; reason: string }> }>> {
-    return [];
+    try {
+      const rows = await this.db.prepare(
+        `SELECT key_hash, status_code, count, reason
+         FROM error_key_stats
+         WHERE date = ?
+         ORDER BY key_hash ASC, status_code ASC`
+      ).bind(today()).all();
+
+      const byKey = new Map<string, Record<string, { count: number; reason: string }>>();
+      for (const row of (rows.results || []) as any[]) {
+        const keyHash = String(row.key_hash || '');
+        const statusCode = String(row.status_code || '');
+        if (!keyHash || !statusCode) continue;
+        const errors = byKey.get(keyHash) || {};
+        errors[statusCode] = {
+          count: Number(row.count || 0),
+          reason: String(row.reason || ''),
+        };
+        byKey.set(keyHash, errors);
+      }
+
+      return Array.from(byKey.entries()).map(([keyHash, errors]) => ({ keyHash, errors }));
+    } catch {
+      return [];
+    }
   }
 
   async getDailyReport(date: string): Promise<DailyReportData | null> {
@@ -354,7 +416,15 @@ export class D1UsageStorage implements UsageStorage {
     }
   }
 
-  async clearKeyErrors(_keyHash: string): Promise<void> { /* no-op */ }
+  async clearKeyErrors(keyHash: string): Promise<void> {
+    try {
+      await this.db.prepare(
+        `DELETE FROM error_key_stats WHERE date = ? AND key_hash = ?`
+      ).bind(today(), keyHash).run();
+    } catch {
+      // Non-critical
+    }
+  }
   async flush(): Promise<void> { /* no-op */ }
 
   private buildUpsert(date: string, provider: string, requests: number, tokens: number, promptTokens: number, completionTokens: number) {
