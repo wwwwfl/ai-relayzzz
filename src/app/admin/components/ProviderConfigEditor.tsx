@@ -206,13 +206,22 @@ export default function ProviderConfigEditor({
           color: configMessage.type === 'success' ? '#34d399' : '#fca5a5',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
+          alignItems: 'flex-start',
+          gap: '0.75rem',
         }}>
-          <span>{configMessage.text}</span>
+          <span style={{
+            minWidth: 0,
+            maxHeight: '8rem',
+            overflowY: 'auto',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+            whiteSpace: 'pre-wrap',
+            lineHeight: 1.45,
+          }}>{configMessage.text}</span>
           <button
             onClick={() => setConfigMessage(null)}
             style={{
-              background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1.2rem', padding: '0 0.5rem'
+              background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1.2rem', padding: '0 0.5rem', flexShrink: 0
             }}
           >
             ×

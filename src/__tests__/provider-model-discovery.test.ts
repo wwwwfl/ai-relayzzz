@@ -77,6 +77,41 @@ describe('admin provider upstream model discovery', () => {
     expect(json.error.message).toContain('invalid api key');
   });
 
+  it('summarizes upstream HTML error pages instead of returning the full page', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>403 | Forbidden</title>
+          <meta name="description" content="Access to this page is forbidden">
+          <style>${'body{color:red;}'.repeat(100)}</style>
+        </head>
+        <body><svg>${'<path d="M0 0h1v1z"/>'.repeat(100)}</svg></body>
+      </html>
+    `, { status: 403, headers: { 'Content-Type': 'text/html; charset=utf-8' } })));
+
+    const { POST } = await import('../app/api/admin/providers/models/route');
+    const res = await POST(req({
+      providerConfig: {
+        name: 'html_provider',
+        displayName: 'HTML Provider',
+        baseUrl: 'https://example.com/v1',
+        headerFormat: 'openai',
+        modelPrefixes: ['html-'],
+        envKeyField: 'HTML_PROVIDER_KEYS',
+      },
+      key: 'sk-test-key',
+    }));
+
+    expect(res.status).toBe(502);
+    const json = await res.json();
+    expect(json.error.message).toContain('403 | Forbidden');
+    expect(json.error.message).toContain('Access to this page is forbidden');
+    expect(json.error.message).not.toContain('<html');
+    expect(json.error.message).not.toContain('<svg');
+    expect(json.error.message.length).toBeLessThan(120);
+  });
+
   it('resolves key from hash: prefix in body.key', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       object: 'list',

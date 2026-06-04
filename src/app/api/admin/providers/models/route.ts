@@ -114,7 +114,15 @@ async function readUpstreamError(response: Response): Promise<string> {
       const json = JSON.parse(text);
       return json.error?.message || json.error || text;
     } catch {
-      return text;
+      const trimmed = text.trim();
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/html') || /^<!doctype html/i.test(trimmed) || /^<html/i.test(trimmed)) {
+        const title = trimmed.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
+        const description = trimmed.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
+        const summary = [title, description].filter(Boolean).join(' - ');
+        return summary || `${response.status} ${response.statusText || 'HTML error page from upstream'}`;
+      }
+      return trimmed.length > 600 ? `${trimmed.slice(0, 600)}...` : trimmed;
     }
   } catch (err: any) {
     return `Error reading upstream response: ${err.message}`;
