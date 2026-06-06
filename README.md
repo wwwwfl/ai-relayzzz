@@ -56,6 +56,7 @@
 - [通知与告警](#-通知与告警)
 - [使用场景](#-使用场景)
 - [贡献指南](#-贡献指南)
+- [常见问题 (FAQ)](#-常见问题-faq)
 - [更新日志](#-更新日志)
 - [许可证](#-许可证)
 
@@ -478,6 +479,10 @@ Client → CF Pages Worker (全球分发, <50ms 延迟)
 - [Vercel](https://vercel.com) — Edge Runtime + KV 存储
 - [OpenAI](https://platform.openai.com) — OpenAI 兼容 API 标准
 - [Linux Do](https://linux.do/) — 温暖的开发者社区，AI Relay 的灵感来源
+
+## ❓ 常见问题 (FAQ)
+
+使用过程中遇到问题？请查看 [FAQ 文档](docs/FAQ.md)，包含部署、配置、使用等方面的常见问题及解决方案。
 
 ## 📝 更新日志
 
