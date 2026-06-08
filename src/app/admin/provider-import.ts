@@ -121,6 +121,36 @@ export function parseProviderImportLink(input: string): ProviderImportPayload {
     throw new Error('missing-import-link');
   }
 
+  if (value.startsWith('{')) {
+    let payload: any;
+    try {
+      payload = JSON.parse(value);
+    } catch {
+      throw new Error('invalid-import-data');
+    }
+
+    const id = typeof payload?.id === 'string' ? payload.id.trim() : '';
+    const baseUrl = typeof payload?.url === 'string'
+      ? payload.url.trim().replace(/\/+$/, '')
+      : typeof payload?.baseUrl === 'string'
+        ? payload.baseUrl.trim().replace(/\/+$/, '')
+        : '';
+    const apiKey = typeof payload?.key === 'string'
+      ? payload.key.trim()
+      : typeof payload?.apiKey === 'string'
+        ? payload.apiKey.trim()
+        : '';
+
+    if (!baseUrl || !baseUrl.startsWith('https://')) throw new Error('invalid-base-url');
+    if (!apiKey) throw new Error('missing-api-key');
+
+    return {
+      id: id || deriveProviderIdFromBaseUrl(baseUrl),
+      baseUrl,
+      apiKey,
+    };
+  }
+
   let url: URL;
   try {
     url = new URL(value);

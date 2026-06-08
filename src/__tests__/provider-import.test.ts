@@ -30,6 +30,32 @@ describe('NewAPI provider import links', () => {
     });
   });
 
+  it('parses NewAPI channel connection JSON', () => {
+    expect(parseProviderImportLink(JSON.stringify({
+      _type: 'newapi_channel_conn',
+      key: 'sk-mock-newapi-channel-key-xxxxxxxxx',
+      url: 'https://new.lucky0625.qzz.io',
+    }))).toEqual({
+      id: 'new_lucky0625_qzz_io',
+      baseUrl: 'https://new.lucky0625.qzz.io',
+      apiKey: 'sk-mock-newapi-channel-key-xxxxxxxxx',
+    });
+  });
+
+  it('builds NewAPI channel connection JSON with a /v1 API base', () => {
+    const payload = parseProviderImportLink(JSON.stringify({
+      _type: 'newapi_channel_conn',
+      key: 'sk-mock-newapi-channel-key-xxxxxxxxx',
+      url: 'https://new.lucky0625.qzz.io',
+    }));
+
+    expect(buildImportedProviderConfig({ payload, providers: [] })).toMatchObject({
+      baseUrl: 'https://new.lucky0625.qzz.io/v1',
+      name: 'new_lucky0625_qzz_io',
+      userAgent: DEFAULT_NEWAPI_IMPORT_USER_AGENT,
+    });
+  });
+
   it('normalizes imported provider IDs for the existing backend validator', () => {
     expect(normalizeProviderId('new-api')).toBe('new_api');
     expect(normalizeProviderId('  New API!!  ')).toBe('new_api');
