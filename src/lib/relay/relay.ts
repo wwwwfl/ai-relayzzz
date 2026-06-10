@@ -97,6 +97,7 @@ async function fetchUpstreamWithUserAgentCandidates(input: {
   // request text here so we can skip a costly re-serialization of large
   // bodies. Falls back to JSON.stringify when absent. See tryProviderWithRetries.
   rawPayload?: string;
+  passthroughHeaders?: Record<string, string>;
 }): Promise<Response> {
   const payload = input.rawPayload ?? JSON.stringify(input.body);
   let lastResponse: Response | null = null;
@@ -116,7 +117,7 @@ async function fetchUpstreamWithUserAgentCandidates(input: {
     try {
       response = await fetch(input.url, {
         method: 'POST',
-        headers: buildHeaders(input.provider.headerFormat, input.apiKey, input.isStream, input.clientUserAgent, customUserAgent),
+        headers: buildHeaders(input.provider.headerFormat, input.apiKey, input.isStream, input.clientUserAgent, customUserAgent, input.passthroughHeaders),
         body: payload,
         signal: controller?.signal,
       });
@@ -165,7 +166,8 @@ export async function relayRequest(
   body: RelayRequestBody,
   apiType: RelayApiType = 'chat',
   userAgent?: string,
-  rawBody?: string
+  rawBody?: string,
+  passthroughHeaders?: Record<string, string>
 ): Promise<RelayResult> {
   const provider = await resolveProvider(body.model);
   if (!provider) {
@@ -176,17 +178,20 @@ export async function relayRequest(
     );
   }
 
+  if (apiType === 'anthropicMessages') {
+    const resolvedModel = await resolveModelAlias(body.model);
+    if (!resolvedModel.toLowerCase().startsWith('claude-')) {
+      throw new RelayError(
+        `/v1/messages requires a claude-* model. Got ${body.model} (resolves to ${resolvedModel}).`,
+        'invalid_request_error',
+        400
+      );
+    }
+  }
+
   if (apiType === 'responses' && provider.headerFormat === 'anthropic') {
     throw new RelayError(
       `Responses API is not supported for Anthropic-format providers (${provider.displayName}). Only OpenAI-compatible providers support /v1/responses.`,
-      'invalid_request_error',
-      400
-    );
-  }
-
-  if (apiType === 'anthropicMessages' && provider.headerFormat !== 'anthropic') {
-    throw new RelayError(
-      `Anthropic Messages API is only supported for Anthropic-format providers. Model ${body.model} resolved to ${provider.displayName}.`,
       'invalid_request_error',
       400
     );
@@ -200,7 +205,7 @@ export async function relayRequest(
       if (routingDecision.provider !== provider.name) {
         const allProviders = await getAllProviders();
         const reroutedProvider = allProviders[routingDecision.provider];
-        if (reroutedProvider && (apiType !== 'anthropicMessages' || reroutedProvider.headerFormat === 'anthropic')) {
+        if (reroutedProvider) {
           console.log(`[smart-route] Rerouting ${provider.displayName} → ${reroutedProvider.displayName} (${routingDecision.reason})`);
           effectiveProvider = reroutedProvider;
         }
@@ -242,7 +247,7 @@ export async function relayRequest(
 
       // Try primary provider with retries (with concurrency control)
       primaryResult = await withConcurrency(
-        () => tryProviderWithRetries(effectiveProvider, body, apiKey, maxRetries, apiType, smartRoutingConfigured, userAgent, rawBody)
+        () => tryProviderWithRetries(effectiveProvider, body, apiKey, maxRetries, apiType, smartRoutingConfigured, userAgent, rawBody, passthroughHeaders)
       );
       if (primaryResult.result) {
         return primaryResult.result;
@@ -303,14 +308,10 @@ export async function relayRequest(
       continue;
     }
 
-    if (apiType === 'anthropicMessages' && fbProvider.headerFormat !== 'anthropic') {
-      console.warn(`[fallback] ${fbProvider.displayName} does not support Anthropic Messages API, skipping`);
-      errors.push({ provider: fbProvider.displayName, error: 'Anthropic Messages API not supported (non-Anthropic format)' });
-      continue;
-    }
+    // Supported fallback to non-Anthropic format via request translation.
 
     const fbResult = await withConcurrency(
-      () => tryProviderWithRetries(fbProvider, fbBody, fbKey, fbMaxRetries, apiType, smartRoutingConfigured, userAgent)
+      () => tryProviderWithRetries(fbProvider, fbBody, fbKey, fbMaxRetries, apiType, smartRoutingConfigured, userAgent, undefined, passthroughHeaders)
     );
     if (fbResult.result) {
       return fbResult.result;
@@ -343,7 +344,8 @@ async function tryProviderWithRetries(
   // forwarded as-is to skip a costly JSON.stringify of large bodies. Only
   // supplied for the primary attempt on Cloudflare; fallbacks remap the model
   // and so always re-serialize. See relayRequest.
-  rawBody?: string
+  rawBody?: string,
+  passthroughHeaders?: Record<string, string>
 ): Promise<{ result: RelayResult | null; lastError: Error | null }> {
   let currentKey = initialKey;
   let lastError: Error | null = null;
@@ -388,8 +390,20 @@ async function tryProviderWithRetries(
     // For Responses API: pass body directly (no Anthropic transform — Responses API is OpenAI-only)
     // For Chat API: inject stream_options and optionally transform to Anthropic format
     let requestBody: Record<string, unknown>;
-    if (apiType === 'responses' || apiType === 'anthropicMessages') {
+    if (apiType === 'responses') {
       requestBody = { ...body, model: resolvedModel };
+    } else if (apiType === 'anthropicMessages') {
+      if (provider.headerFormat === 'anthropic') {
+        requestBody = { ...body, model: resolvedModel };
+      } else {
+        const { transformAnthropicToOpenAI } = await import('./transform');
+        requestBody = transformAnthropicToOpenAI({ ...body, model: resolvedModel });
+        // Inject stream_options for OpenAI streaming so usage arrives in the final chunk
+        if (body.stream) {
+          const existingOpts = typeof requestBody.stream_options === 'object' && requestBody.stream_options !== null ? requestBody.stream_options : {};
+          requestBody.stream_options = { include_usage: true, ...existingOpts };
+        }
+      }
     } else {
       const bodyWithResolvedModel: Record<string, unknown> = { ...body, model: resolvedModel };
       if (injectStreamOptions) {
@@ -405,14 +419,17 @@ async function tryProviderWithRetries(
     // rewritten (→ cannot raw-forward) only when:
     //   - the upstream model differs from the requested one (alias/mapping/fallback), or
     //   - stream_options were injected (chat, non-anthropic, non-CF), or
-    //   - the chat→anthropic transform was applied (transformToAnthropic).
-    // The anthropicMessages and responses paths only swap the model, so an
-    // unchanged model there means the raw text is safe to forward as-is —
-    // this is what keeps large Claude Code requests under CF's CPU budget.
+    //   - the chat→anthropic transform was applied (transformToAnthropic), or
+    //   - the anthropic→OpenAI transform was applied (anthropicMessages to a
+    //     non-anthropic provider — transformAnthropicToOpenAI rewrites the body).
+    // The anthropicMessages-to-anthropic and responses paths only swap the
+    // model, so an unchanged model there means the raw text is safe to forward
+    // as-is — this is what keeps large Claude Code requests under CF's CPU budget.
     const bodyRewritten =
       resolvedModel !== body.model ||
       injectStreamOptions ||
-      (apiType === 'chat' && isAnthropic);
+      (apiType === 'chat' && isAnthropic) ||
+      (apiType === 'anthropicMessages' && !isAnthropic);
     const rawPayload = rawBody && !bodyRewritten ? rawBody : undefined;
 
     const startTime = Date.now();
@@ -432,6 +449,7 @@ async function tryProviderWithRetries(
         url,
         body: requestBody,
         rawPayload,
+        passthroughHeaders,
       });
 
       const latencyMs = Date.now() - startTime;

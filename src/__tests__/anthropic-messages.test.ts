@@ -72,7 +72,7 @@ describe('Anthropic Messages API relay', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error.message).toContain('Anthropic Messages API is only supported');
+    expect(json.error.message).toContain('requires a claude-* model');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
