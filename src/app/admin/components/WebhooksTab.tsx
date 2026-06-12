@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { WebhookSettings, AlertThreshold } from '../types';
 import WebhookList from './WebhookList';
 import AlertThresholds from './AlertThresholds';
@@ -113,10 +113,9 @@ export default function WebhooksTab({ apiKey, lang, providers, onRefreshData }: 
   // ---- State ----
   const [settings, setSettings] = useState<WebhookSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
-  const [thresholds, setThresholds] = useState<AlertThreshold[]>([]);
 
   // ---- Load settings ----
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     setLoadingSettings(true);
     try {
       const res = await fetch('/api/admin/webhooks', {
@@ -126,21 +125,22 @@ export default function WebhooksTab({ apiKey, lang, providers, onRefreshData }: 
       const data = await res.json();
       const s: WebhookSettings = data.settings || { webhooks: [], alertThresholds: [], reportTime: '21:00', reportTimezone: 'Asia/Shanghai' };
       setSettings(s);
-
-      // Initialize thresholds — merge providers with existing
-      const existing = s.alertThresholds || [];
-      const merged = providers.map(p => {
-        const found = existing.find(t => t.provider === p.id);
-        return found || { provider: p.id };
-      });
-      setThresholds(merged);
     } catch {
       setSettings({ webhooks: [], alertThresholds: [], reportTime: '21:00', reportTimezone: 'Asia/Shanghai' });
-      setThresholds(providers.map(p => ({ provider: p.id })));
     } finally {
       setLoadingSettings(false);
     }
-  };
+  }, [apiKey]);
+
+  // Compute thresholds dynamically based on loaded settings and providers list
+  const thresholds = useMemo(() => {
+    if (!settings) return [];
+    const existing = settings.alertThresholds || [];
+    return providers.map(p => {
+      const found = existing.find(t => t.provider === p.id);
+      return found || { provider: p.id };
+    });
+  }, [settings, providers]);
 
   useEffect(() => {
     fetchSettings();
