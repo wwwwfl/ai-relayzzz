@@ -91,3 +91,29 @@ export const usageQuotas = pgTable('usage_quotas', {
 }, (table) => [
   uniqueIndex('usage_quotas_unique').on(table.orgId, table.period, table.periodKey),
 ]);
+
+// ── 6. Request Logs ─────────────────────────────────────────
+
+export const requestLogs = pgTable('request_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  traceId: text('trace_id').notNull(),
+  timestamp: timestamp('timestamp', { withTimezone: true }).notNull(),
+  apiKeyHash: text('api_key_hash').notNull(),
+  model: text('model').notNull(),
+  provider: text('provider').notNull(),
+  status: text('status').notNull(),                      // 'success' | 'error'
+  httpStatus: integer('http_status').notNull(),
+  latencyMs: integer('latency_ms').notNull(),
+  promptTokens: integer('prompt_tokens'),
+  completionTokens: integer('completion_tokens'),
+  totalTokens: integer('total_tokens'),
+  isStream: integer('is_stream').notNull().default(0),  // boolean
+  errorType: text('error_type'),
+  errorMessage: text('error_message'),
+  diagnostic: text('diagnostic'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('request_logs_timestamp_idx').on(table.timestamp),
+  index('request_logs_status_idx').on(table.status),
+  index('request_logs_provider_idx').on(table.provider),
+]);

@@ -103,6 +103,21 @@ export default function RequestLogsTab({ t }: Props) {
     try {
       const cached = localStorage.getItem('airelay_admin_key');
       if (!cached) return;
+
+      // Enable capture for 5 minutes (on-demand logging when tab is open)
+      try {
+        await fetch('/api/admin/request-logs', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${cached}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'enable_capture', ttl: 300 }),
+        });
+      } catch {
+        // Non-critical: if enable fails, we still fetch what's already logged
+      }
+
       const params = new URLSearchParams({ status: 'all', limit: String(getMaxEntries()) });
       const res = await fetch(`/api/admin/request-logs?${params.toString()}`, {
         headers: { Authorization: `Bearer ${cached}` },

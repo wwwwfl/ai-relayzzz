@@ -1,12 +1,19 @@
 // ============================================================
-// AI Relay v2.1 — Request Logs (memory-only)
+// AI Relay v2.1 — Request Logs (unified storage)
 // ============================================================
 //
-// Lightweight in-memory request log for debugging.
-// No KV storage — logs live only in the serverless instance memory.
+// Request log with unified storage backend (Postgres/KV/D1/Memory).
+// Supports on-demand capture: logs are only written when the admin tab is open.
 // Configure via env vars:
 //   ENABLE_REQUEST_LOGS=true    to enable (default: disabled)
-//   REQUEST_LOGS_MAX_ENTRIES=50 max entries to keep in memory (default: 50)
+//   REQUEST_LOGS_MAX_ENTRIES=50 max entries per backend (default: varies by backend)
+
+import {
+  getDefaultRequestLogStore,
+  __resetDefaultRequestLogStore,
+  type RequestLogEntry as StoreEntry,
+  type RequestLogFilters as StoreFilters,
+} from './request-log-store';
 
 export type RequestLogStatus = 'success' | 'error';
 
@@ -38,7 +45,7 @@ export interface RequestLogFilters {
 export interface RequestLogListResult {
   items: RequestLogEntry[];
   degraded: boolean;
-  source: 'memory';
+  source: 'postgres' | 'kv' | 'memory';
 }
 
 // ── Configuration ────────────────────────────────────────────
@@ -46,15 +53,7 @@ function isRequestLogsEnabled(): boolean {
   return process.env.ENABLE_REQUEST_LOGS === 'true';
 }
 
-function getMaxEntries(): number {
-  const raw = process.env.REQUEST_LOGS_MAX_ENTRIES;
-  if (!raw) return 50;
-  const n = parseInt(raw, 10);
-  return isNaN(n) || n < 1 ? 50 : Math.min(n, 500); // hard cap at 500
-}
-
 const DEFAULT_LIMIT = 50;
-const requestLogStore: RequestLogEntry[] = [];
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -77,49 +76,129 @@ function sanitizeEntry(entry: RequestLogEntry): RequestLogEntry {
   };
 }
 
-function applyFilters(items: RequestLogEntry[], filters: RequestLogFilters = {}): RequestLogEntry[] {
-  const limit = Math.min(Math.max(filters.limit || DEFAULT_LIMIT, 1), 200);
-  return items
-    .filter((item) => !filters.status || filters.status === 'all' || item.status === filters.status)
-    .filter((item) => !filters.provider || item.provider === filters.provider)
-    .filter((item) => !filters.traceId || item.traceId.includes(filters.traceId))
-    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-    .slice(0, limit);
+function toStoreEntry(entry: RequestLogEntry): StoreEntry {
+  return {
+    traceId: entry.traceId,
+    timestamp: entry.timestamp,
+    apiKeyHash: entry.apiKeyHash || '',
+    model: entry.model || '',
+    provider: entry.provider || '',
+    status: entry.status,
+    httpStatus: entry.httpStatus,
+    latencyMs: entry.latencyMs,
+    promptTokens: entry.promptTokens,
+    completionTokens: entry.completionTokens,
+    totalTokens: entry.totalTokens,
+    isStream: entry.isStream,
+    errorType: entry.errorType,
+    errorMessage: entry.errorMessage,
+    diagnostic: entry.diagnostic,
+  };
 }
 
-function remember(entry: RequestLogEntry): void {
-  requestLogStore.unshift(entry);
-  const max = getMaxEntries();
-  if (requestLogStore.length > max) requestLogStore.length = max;
+function fromStoreEntry(entry: StoreEntry): RequestLogEntry {
+  return {
+    traceId: entry.traceId,
+    timestamp: entry.timestamp,
+    apiKeyHash: entry.apiKeyHash || undefined,
+    model: entry.model || undefined,
+    provider: entry.provider || undefined,
+    status: entry.status,
+    httpStatus: entry.httpStatus,
+    latencyMs: entry.latencyMs,
+    promptTokens: entry.promptTokens,
+    completionTokens: entry.completionTokens,
+    totalTokens: entry.totalTokens,
+    isStream: entry.isStream,
+    errorType: entry.errorType,
+    errorMessage: entry.errorMessage,
+    diagnostic: entry.diagnostic,
+  };
+}
+
+function applyTraceIdFilter(items: RequestLogEntry[], traceId?: string): RequestLogEntry[] {
+  if (!traceId) return items;
+  return items.filter((item) => item.traceId.includes(traceId));
 }
 
 // ── Public API ───────────────────────────────────────────────
 
 /**
- * Record a request log entry (memory only, no KV).
+ * Record a request log entry (persistent backend: Postgres/KV/D1/Memory).
  */
 export async function recordRequestLog(input: RequestLogEntry): Promise<void> {
   if (!isRequestLogsEnabled()) return;
-  remember(sanitizeEntry(input));
+
+  const store = getDefaultRequestLogStore();
+  const sanitized = sanitizeEntry(input);
+  await store.append(toStoreEntry(sanitized));
 }
 
 /**
- * List request logs from memory.
+ * List request logs from persistent backend.
  */
 export async function listRequestLogs(filters: RequestLogFilters = {}): Promise<RequestLogListResult> {
   if (!isRequestLogsEnabled()) {
     return { items: [], degraded: false, source: 'memory' };
   }
-  return { items: applyFilters(requestLogStore, filters), degraded: false, source: 'memory' };
+
+  const store = getDefaultRequestLogStore();
+  const limit = Math.min(Math.max(filters.limit || DEFAULT_LIMIT, 1), 200);
+
+  const storeFilters: StoreFilters = {
+    status: filters.status === 'all' ? undefined : filters.status,
+    provider: filters.provider,
+    limit,
+  };
+
+  const items = await store.list(storeFilters);
+  const converted = items.map(fromStoreEntry);
+
+  // Apply client-side traceId filter (not all backends support it natively)
+  const filtered = applyTraceIdFilter(converted, filters.traceId);
+
+  // Detect backend type for source label
+  const storeName = store.constructor.name;
+  const source = storeName.includes('Postgres')
+    ? 'postgres'
+    : storeName.includes('KV')
+      ? 'kv'
+      : 'memory';
+
+  return { items: filtered, degraded: false, source };
+}
+
+/**
+ * Enable on-demand capture for a short TTL window (e.g., when admin opens the logs tab).
+ */
+export async function enableRequestLogCapture(ttlSeconds = 300): Promise<void> {
+  if (!isRequestLogsEnabled()) return;
+  const store = getDefaultRequestLogStore();
+  await store.enableCapture(ttlSeconds);
+}
+
+/**
+ * Check if capture is currently enabled.
+ */
+export async function isRequestLogCaptureEnabled(): Promise<boolean> {
+  if (!isRequestLogsEnabled()) return false;
+  const store = getDefaultRequestLogStore();
+  return await store.isCaptureEnabled();
 }
 
 // ── Test helpers ─────────────────────────────────────────────
 
 export const __requestLogStoreForTests = {
-  clear(): void {
-    requestLogStore.length = 0;
+  async clear(): Promise<void> {
+    const store = getDefaultRequestLogStore();
+    await store.clear();
+    // Reset the singleton so the next store re-reads env (e.g. stubbed
+    // REQUEST_LOGS_MAX_ENTRIES) and starts with capture disabled.
+    __resetDefaultRequestLogStore();
   },
-  items(): RequestLogEntry[] {
-    return [...requestLogStore];
+  async items(): Promise<RequestLogEntry[]> {
+    const result = await listRequestLogs({ limit: 500 });
+    return result.items;
   },
 };
+
