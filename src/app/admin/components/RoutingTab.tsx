@@ -455,7 +455,10 @@ function btnStyle(bg: string): React.CSSProperties {
     padding: '0.5rem 1rem',
     borderRadius: '8px',
     border: 'none',
-    backgroundColor: bg,
+    // `background` (not `backgroundColor`) so callers can pass a gradient —
+    // the save button uses linear-gradient(...), which backgroundColor ignores,
+    // leaving the button transparent and the white label unreadable.
+    background: bg,
     color: '#fff',
     cursor: 'pointer',
     fontSize: '0.85rem',
