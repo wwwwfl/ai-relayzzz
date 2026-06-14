@@ -86,13 +86,13 @@ export default function FallbackChainEditor(props: FallbackChainEditorProps) {
 
       {/* Provider selector */}
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>{t.fallbackProviderLabel}</span>
+        <span style={{ color: '#9ca3af', fontSize: '0.85rem', flexShrink: 0 }}>{t.fallbackProviderLabel}</span>
         <select
           value={selectedProvider || ''}
           onChange={(e) => setSelectedProvider(e.target.value || null)}
           className="custom-select"
           style={{
-            flex: '1 1 220px',
+            flex: '1 1 0',
             minWidth: 0,
             padding: '0.5rem 0.8rem',
             borderRadius: '6px',
@@ -331,14 +331,15 @@ export default function FallbackChainEditor(props: FallbackChainEditorProps) {
             });
             const availableToAdd = data.providers.filter(p => p.id !== selectedProvider && !usedProviders.includes(p.id)) || [];
             return availableToAdd.length > 0 ? (
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 <select
                   value={selectedFallbackToAdd}
                   onChange={(e) => setSelectedFallbackToAdd(e.target.value)}
                   disabled={operationLoading}
                   className="custom-select"
                   style={{
-                    flex: 1,
+                    flex: '1 1 0',
+                    minWidth: 0,
                     padding: '0.5rem 0.8rem',
                     borderRadius: '6px',
                     border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -370,6 +371,7 @@ export default function FallbackChainEditor(props: FallbackChainEditorProps) {
                     fontSize: '0.85rem',
                     cursor: operationLoading || !selectedFallbackToAdd ? 'not-allowed' : 'pointer',
                     transition: 'all 0.2s',
+                    flexShrink: 0,
                   }}
                   onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; }}
                   onMouseLeave={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'; }}
