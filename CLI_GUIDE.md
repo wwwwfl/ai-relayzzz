@@ -26,8 +26,9 @@ airelay local:start --config ./relay-config.json
 export RELAY_CLOUD_URL="https://cfairelay.izmw.me"
 airelay local:start
 
-# 方式 4: 自定义端口
-airelay local:start --port 3000 --host 0.0.0.0
+# 方式 4: 自定义端口和主机
+airelay local:start --port 3000 --host localhost
+# ⚠️ 警告：使用 --host 0.0.0.0 会暴露到公网，仅在安全网络环境下使用
 ```
 
 ## 配置方式
