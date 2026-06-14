@@ -144,8 +144,11 @@ jobs:
           echo ""
           echo "=== Provisioning KV namespace ==="
 
-          # wrangler kv namespace list outputs JSON by default (--json is NOT supported)
-          KV_LIST=$(pnpm exec wrangler kv namespace list 2>/dev/null || echo "[]")
+          # wrangler kv namespace list outputs JSON by default (--json is NOT supported).
+          # pnpm prints progress lines ("Already up to date", "Done in ...") to stdout,
+          # so strip everything before the first "[" to isolate the JSON array for jq.
+          KV_LIST=$(pnpm exec wrangler kv namespace list 2>/dev/null | awk '/^\[/{f=1} f' || echo "[]")
+          [ -z "$KV_LIST" ] && KV_LIST="[]"
           echo "KV namespaces found: $(echo "$KV_LIST" | jq 'length' 2>/dev/null || echo 'unknown')"
 
           # Search for existing namespace.
@@ -168,7 +171,8 @@ jobs:
             # If wrangler reports "already exists", re-fetch the list and find it
             if echo "$KV_OUTPUT" | grep -qi "already exists"; then
               echo "Namespace already exists (title conflict); re-fetching list to obtain id..."
-              KV_LIST=$(pnpm exec wrangler kv namespace list 2>/dev/null || echo "[]")
+              KV_LIST=$(pnpm exec wrangler kv namespace list 2>/dev/null | awk '/^\[/{f=1} f' || echo "[]")
+              [ -z "$KV_LIST" ] && KV_LIST="[]"
               for TITLE in "KV" "ai-relay-KV" "ai-relay" "ai-relay-ai-relay"; do
                 FOUND=$(echo "$KV_LIST" | jq -r ".[] | select(.title == \"${TITLE}\") | .id" 2>/dev/null || echo "")
                 if [ -n "$FOUND" ] && [ "$FOUND" != "null" ]; then
