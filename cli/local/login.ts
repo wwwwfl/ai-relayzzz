@@ -21,7 +21,7 @@ export async function login(cloudUrl: string, options: LoginOptions) {
     }),
   });
 
-  if (\!response.ok) {
+  if (!response.ok) {
     console.error('❌ Failed to create device session');
     process.exit(1);
   }
@@ -44,7 +44,7 @@ export async function login(cloudUrl: string, options: LoginOptions) {
       `${cloudUrl}/api/local/devices/session?code=${device_code}`
     );
 
-    if (\!pollResponse.ok) {
+    if (!pollResponse.ok) {
       if (pollResponse.status === 410) {
         console.error('\n❌ Session expired. Please run login again.');
         process.exit(1);
@@ -55,7 +55,7 @@ export async function login(cloudUrl: string, options: LoginOptions) {
     const result = await pollResponse.json();
 
     if (result.status === 'completed') {
-      console.log('✅ Device verified\!\n');
+      console.log('✅ Device verified!\n');
 
       await saveProfile({
         cloudUrl,
@@ -64,9 +64,9 @@ export async function login(cloudUrl: string, options: LoginOptions) {
         deviceName: options.device_name,
       });
 
-      console.log(`✨ Login successful\!`);
+      console.log(`✨ Login successful!`);
       console.log(`   Device ID: ${result.device_id}`);
-      console.log(`\n👉 Next: Run "ai-relay local start" to start the relay\n`);
+      console.log(`\n👉 Next: Run "airelay local:start" to start the relay\n`);
       return;
     }
 

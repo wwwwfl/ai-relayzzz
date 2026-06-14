@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S npx -y tsx
 
 // ============================================================
 // AI Relay CLI — Entry Point
@@ -10,7 +10,7 @@ import * as os from 'os';
 const program = new Command();
 
 program
-  .name('ai-relay')
+  .name('airelay')
   .version('2.13.0')
   .description('AI Relay Local Runtime CLI');
 
@@ -20,11 +20,11 @@ program
   .action(async (cloudUrl?: string) => {
     if (!cloudUrl) {
       console.log('Cloud login is optional. You can also:');
-      console.log('  - Use local config: ai-relay local:start --config ./config.json');
+      console.log('  - Use local config: airelay local:start --config ./config.json');
       console.log('  - Set environment: export RELAY_CONFIG_PATH=./config.json');
       console.log('  - Use inline keys: export OPENAI_KEYS=sk-xxx');
       console.log('\nFor cloud login, provide the URL:');
-      console.log('  ai-relay login <cloud-url>');
+      console.log('  airelay login <cloud-url>');
       return;
     }
 
@@ -68,7 +68,7 @@ program
 
     const profile = await loadProfile();
     if (!profile) {
-      console.error('❌ Not logged in. Run "ai-relay login" first.');
+      console.error('❌ Not logged in. Run "airelay login" first.');
       process.exit(1);
     }
 

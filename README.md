@@ -47,6 +47,7 @@
 
 - [特性](#-特性)
 - [一键部署：2 分钟上线你的 AI API 网关](#-一键部署2-分钟上线你的-ai-api-网关)
+- [本地 Relay 运行时（CLI）](#-本地-relay-运行时cli)
 - [同类项目对比](#-同类项目对比)
 - [为什么选择 AI Relay](#为什么选择-ai-relay)
 - [使用方法](#-使用方法)
@@ -209,7 +210,66 @@ curl https://ai-relay.pages.dev/health
 </details>
 
 <details>
-<summary><strong>📦 本地开发</strong></summary>
+<summary><strong>💻 本地 Relay 运行时（CLI）</strong></summary>
+
+除了云端部署，AI Relay 还提供本地 CLI 工具，让你在开发机上运行轻量级的 Relay 服务器。
+
+> 📖 **完整文档**: 查看 [CLI_GUIDE.md](CLI_GUIDE.md) 了解详细配置、故障排查和高级用法。
+
+**快速开始：**
+
+```bash
+# 1. 克隆并安装
+git clone https://github.com/MoyuFamily/ai-relay.git
+cd ai-relay
+pnpm install
+
+# 2. 全局安装 CLI
+npm link
+
+# 3. 启用自动补全（可选，zsh）
+source cli/completions.zsh
+
+# 4. 登录云端（可选，从云端同步配置）
+airelay login https://你的项目.vercel.app
+
+# 5. 启动本地 Relay
+airelay local:start
+# 🚀 本地服务器运行在 http://localhost:8787
+```
+
+**配置方式：**
+
+```bash
+# 方式 1: 云端配置（推荐）
+airelay login https://cfairelay.izmw.me
+airelay local:start
+
+# 方式 2: 本地配置文件
+airelay local:start --config ./relay-config.json
+
+# 方式 3: 环境变量（自动发现所有 *_KEYS）
+export OPENAI_KEYS="sk-xxx"
+export CLAUDE_KEYS="sk-ant-xxx"
+airelay local:start
+
+# 方式 4: 混合模式（云端基础 + 本地覆盖）
+export RELAY_CLOUD_URL="https://cfairelay.izmw.me"
+airelay local:start --config ./local-overrides.json
+```
+
+**详细文档：** 查看 [CLI_GUIDE.md](CLI_GUIDE.md) 了解完整功能和配置选项。
+
+**使用场景：**
+- ✅ 本地开发调试，无需部署到云端
+- ✅ 内网环境，无法访问公网部署
+- ✅ 临时测试新 Provider 配置
+- ✅ CI/CD 流水线中的集成测试
+
+</details>
+
+<details>
+<summary><strong>📦 Web 应用本地开发</strong></summary>
 
 ```bash
 git clone https://github.com/MoyuFamily/ai-relay.git

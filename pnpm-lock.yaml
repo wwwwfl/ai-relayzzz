@@ -11,6 +11,9 @@ importers:
       '@vercel/kv':
         specifier: ^1.0.1
         version: 1.0.1
+      commander:
+        specifier: ^12.0.0
+        version: 12.0.0
       drizzle-orm:
         specifier: ^0.39.0
         version: 0.39.0(@cloudflare/workers-types@4.20260612.1)(@types/react@19.2.17)(postgres@3.4.9)(react@19.2.7)
@@ -2166,6 +2169,10 @@ packages:
   commander@11.1.0:
     resolution: {integrity: sha512-yPVavfyCcRhmorC7rWlkHn15b4wDVgVmBA7kV4QVBsF7kv/9TKJAbAXVTxvTnwP8HHKjRCJDClKbciiYS7p0DQ==}
     engines: {node: '>=16'}
+
+  commander@12.0.0:
+    resolution: {integrity: sha512-MwVNWlYjDTtOjX5PiD7o5pK0UrFU/OYgcJfjjK4RaHZETNtjJqrZa9Y9ds88+A+f+d5lv+561eZ+yCKoS3gbAA==}
+    engines: {node: '>=18'}
 
   commander@2.20.0:
     resolution: {integrity: sha512-7j2y+40w61zy6YC2iRNpUe/NwhNyoXrYpHMrSunaMG64nRnaf96zO/KMQR4OyN/UnE5KLyEBnKHd4aG3rskjpQ==}
@@ -6145,6 +6152,8 @@ snapshots:
       delayed-stream: 1.0.0
 
   commander@11.1.0: {}
+
+  commander@12.0.0: {}
 
   commander@2.20.0: {}
 
