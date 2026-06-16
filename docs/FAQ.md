@@ -94,6 +94,54 @@ RELAY_MONTHLY_LIMIT=30000   # 每月请求上限
 
 ---
 
+## 本地 Relay 相关
+
+### airelay 命令找不到
+
+**症状：** 运行 `airelay` 提示 `command not found`。
+
+**解决方案：**
+1. 确认已执行 `npm link`（在 ai-relay 项目根目录下）
+2. 检查 npm 全局 bin 目录是否在 PATH 中：`npm bin -g`
+3. 如果使用 zsh，确认没有 alias 冲突：`which airelay`
+
+---
+
+### 本地 Relay 启动后无法连接
+
+**症状：** `airelay local:start` 启动成功，但请求返回连接错误。
+
+**解决方案：**
+1. 确认本地服务正在运行：`curl http://localhost:8787/health`
+2. 检查端口是否被占用：`lsof -i :8787`
+3. 如果使用 `--host 0.0.0.0`，检查防火墙设置
+4. 确认 Provider Keys 已配置（云端同步或环境变量）
+
+---
+
+### 本地 Relay 与云端配置如何同步？
+
+**方案：** 使用 `airelay login` 命令登录云端，本地启动时会自动拉取最新配置。
+
+```bash
+airelay login https://你的项目.vercel.app
+airelay local:start  # 自动从云端同步 Provider、Routing 等配置
+```
+
+如果只想覆盖部分配置（混合模式），可以用 `--config` 参数叠加本地文件：
+```bash
+export RELAY_CLOUD_URL="https://你的项目.vercel.app"
+airelay local:start --config ./local-overrides.json
+```
+
+---
+
+### 本地 Relay 支持哪些 Provider？
+
+与云端完全一致：OpenAI、Claude、DeepSeek、MiMo 及任何 OpenAI 兼容的自定义 Provider。配置方式不变，只是运行环境从云端变为本地。
+
+---
+
 ## 其他问题
 
 如果以上内容没有解决你的问题，请：
