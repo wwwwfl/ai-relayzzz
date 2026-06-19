@@ -2,7 +2,7 @@
 
 <img src="docs/assets/logo-banner.svg" alt="AI Relay" width="400">
 
-**你的个人 AI API 网关 — 云端一键部署，本地 CLI 运行，统一管理所有大模型接口**
+**你的个人 AI API 网关 — 云端一键部署，本地 CLI 运行，统一管理所有大模型接**
 
 <p>
   <a href="https://vercel.com/new/clone?repository-url=https://github.com/MoyuFamily/ai-relay&env=RELAY_API_KEY,RELAY_ADMIN_KEY,RELAY_SIGNING_SECRET&envDescription=API%20authentication%20keys%20(required%20for%20security)&envLink=https://github.com/MoyuFamily/ai-relay#-快速开始">
