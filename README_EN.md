@@ -2,7 +2,7 @@
 
 <img src="docs/assets/logo-banner.svg" alt="AI Relay" width="400">
 
-**Your personal AI API gateway — deploy to cloud or run locally, one endpoint for all LLM proider**
+**Your personal AI API gateway — deploy to cloud or locally, one endpoint for all LLM proider**
 
 <p>
   <a href="https://vercel.com/new/clone?repository-url=https://github.com/MoyuFamily/ai-relay&env=RELAY_API_KEY,RELAY_ADMIN_KEY,RELAY_SIGNING_SECRET&envDescription=API%20authentication%20keys%20(required%20for%20security)&envLink=https://github.com/MoyuFamily/ai-relay#-quick-start">
